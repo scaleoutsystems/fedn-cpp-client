@@ -13,9 +13,9 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* out
     return totalSize;
 }
 
-class Client {
+class HttpClient {
 public:
-    Client(const std::string& apiUrl, const std::string& token = "") : apiUrl(apiUrl), token(token) {
+    HttpClient(const std::string& apiUrl, const std::string& token = "") : apiUrl(apiUrl), token(token) {
         curl = curl_easy_init();
         if (!curl) {
             std::cerr << "Error initializing libcurl." << std::endl;
@@ -23,7 +23,7 @@ public:
         }
     }
 
-    ~Client() {
+    ~HttpClient() {
         if (curl) {
             curl_easy_cleanup(curl);
         }
@@ -144,7 +144,7 @@ int main() {
     }
 
     // Create a Client instance with the API URL and token (if provided)
-    Client client(apiUrl, token);
+    HttpClient client(apiUrl, token);
 
     // Send the POST request and get the response JSON
     json responseJson = client.assign(requestData);
