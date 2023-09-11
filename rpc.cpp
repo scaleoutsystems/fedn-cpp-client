@@ -69,7 +69,7 @@ class GreeterClient {
     // Act upon its status.
     if (!status.ok()) {
       // Print response attribute from fedn::Response
-      std::cout << "Response: " << reply.response() << std::endl;
+      std::cout << "HeartbeatResponse: " << reply.response() << std::endl;
       std::cout << status.error_code() << ": " << status.error_message()
                 << std::endl;
     }
@@ -99,12 +99,13 @@ class GreeterClient {
       
     }
     reader->Finish();
-    std::cout << "End of stream" << std::endl;
+    std::cout << "Disconnecting from ModelUpdateRequestStream" << std::endl;
   }
-  void DownloadModel() {
+  std::vector<char> DownloadModel(const std::string& modelID) {
 
     // request 
     ModelRequest request;
+    request.set_id(modelID);
 
     // context
     ClientContext context;
@@ -119,8 +120,8 @@ class GreeterClient {
     // Read from stream
     ModelResponse modelResponse;
     while (reader->Read(&modelResponse)) {
-      
-      // Check if status is ModelStatus::IN_PROGRESS
+      std::cout << "ModelResponseID: " << modelResponse.id() << std::endl;
+      std::cout << "ModelResponseStatus: " << modelResponse.status() << std::endl;
       if (modelResponse.status() == ModelStatus::IN_PROGRESS) {
         const std::string& dataResponse = modelResponse.data();
         accumulatedData.insert(accumulatedData.end(), dataResponse.begin(), dataResponse.end());
@@ -129,30 +130,33 @@ class GreeterClient {
 
       } else if (modelResponse.status() == ModelStatus::OK) {
         // Print download complete
-        std::cout << "Download complete" << std::endl;
+        std::cout << "Download complete for model: " << modelResponse.id() << std::endl;
+      
+      }
+      else if (modelResponse.status() == ModelStatus::FAILED) {
+        // Print download failed
+        std::cout << "Download failed: internal server error" << std::endl;
       
       }
 
     }
     reader->Finish();
     std::cout << "Downloaded size: " << accumulatedData.size() << " bytes" << std::endl;
-    std::cout << "Downloaded model: " << modelResponse.id() << std::endl;
+    std::cout << "Disconnecting from DownloadStream" << std::endl;
     
-    // Garbage collect the vector
-    accumulatedData.clear();
-    
+    // return accumulatedData
+    return accumulatedData;
     }
 
   void SendModelUpdateResponse(ModelUpdate modelUpdate) {
     
   }
 
-  void UpdateLocalModel(std::string modelID) {
+  void UpdateLocalModel(const std::string& modelID) {
     std::cout << "Updating local model: " << modelID << std::endl;
     // Download model from server
-    GreeterClient::DownloadModel();
-
-    
+    std::vector<char> modelData = GreeterClient::DownloadModel(modelID);
+    modelData.shrink_to_fit(); // Deallocates excess memory
   }
 
  private:
