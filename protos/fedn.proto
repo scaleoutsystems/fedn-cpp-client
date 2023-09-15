@@ -64,6 +64,7 @@ message ModelUpdate {
   string correlation_id = 5;
   string timestamp = 6;
   string meta = 7;
+  string config = 8;
 }
 
 message ModelValidationRequest {
