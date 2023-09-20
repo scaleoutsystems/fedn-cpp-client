@@ -1,7 +1,7 @@
 # fedn-cpp
 A FEDn client in C++.
 
-Obs this is just a prototype and is still very much in development! The perpose of this prototype is to demonstrate the capabilities of the C++ client to connect to the federated network. In the example below, there is no model training being performed on the client. Instead, the global model is dowloaded to the client and the same model is sent back to combiner (demonstrating the connectivity of model updates).
+Obs this is just a prototype and is still very much in development! The perpose of this prototype is to demonstrate the capabilities of the C++ client to connect to the federated network. In the example below, there is no model training being performed on the client. Instead, the global model is downloaded to the client and the same model is sent back to the combiner (demonstrating the connectivity of model updates).
 
 ## Build from source
 Follow the gRPC C++ quickstart guide to build and locally install gRPC and Protocol Buffers.
@@ -19,10 +19,11 @@ https://grpc.io/docs/languages/cpp/quickstart/
     pushd cmake/build
     cmake ../..
     make -j 4
+    popd
 
 
 ## Starting Servers
-This is a prototype and certain configurations (such as client name and combiner assignment) has been hardcoded for the pseudo-distributed docker compose setup in FEDn. We will be using a compute package written in python, there will accutaly not be any ML updates to models on the C++ client, instead it will just reupload the same global model weights. There will also not be any validation (not implemented yet).
+This is a prototype and certain configurations (such as client name and combiner assignment) has been hardcoded for the pseudo-distributed docker compose setup in FEDn. We will be using a compute package written in python, there will not be any ML updates to models on the C++ client, instead it will just reupload the same global model weights. Validation is also not included (not implemented yet).
 
 First deploy e.g FEDn mnist-keras example: https://github.com/scaleoutsystems/fedn/tree/master/examples/mnist-keras
 
@@ -55,7 +56,7 @@ The expected output should be:'
 
 The client is then waiting for model update requests from combiner.
 
-Start a traning session either via the dashboard or APIClient.
+Start a training session either via the dashboard or APIClient.
 
 The expected output should look similar to this:
 
