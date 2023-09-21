@@ -48,12 +48,13 @@ class GreeterClient {
   // from the server.
   void SayHello() {
     // Data we are sending to the server.
-    Client client;
-    client.set_name("test");
-    client.set_role(WORKER);
+    Client* client = new Client();
+    client->set_name("test");
+    client->set_role(WORKER);
 
     Heartbeat request;
-    request.set_allocated_sender(&client);
+    // Pass ownership of client to protobuf message
+    request.set_allocated_sender(client);
 
     // Container for the data we expect from the server.
     Response reply;
@@ -68,8 +69,8 @@ class GreeterClient {
     // Print response attribute from fedn::Response
     std::cout << "Response: " << reply.response() << std::endl;
   
-    // Garbage collect the request object.
-    request.release_sender();
+    // Garbage collect the client object.
+    //Client* client = request.release_sender();
   
     // Act upon its status.
     if (!status.ok()) {
@@ -82,13 +83,13 @@ class GreeterClient {
 
   void ConnectModelUpdateStream() {
     // Data we are sending to the server.
-    Client client;
-    client.set_name("test");
-    client.set_role(WORKER);
+    Client* client = new Client();
+    client->set_name("test");
+    client->set_role(WORKER);
 
     ClientAvailableMessage request;
-
-    request.set_allocated_sender(&client);
+    // Pass ownership of client to protobuf message
+    request.set_allocated_sender(client);
 
     ClientContext context;
 
@@ -171,9 +172,9 @@ class GreeterClient {
     ClientContext context;
 
     // Client
-    Client client;
-    client.set_name("test");
-    client.set_role(WORKER);
+    Client* client = new Client();
+    client->set_name("test");
+    client->set_role(WORKER);
 
     // Get ClientWriter from stream
     std::unique_ptr<ClientWriter<ModelRequest> > writer(
@@ -184,7 +185,8 @@ class GreeterClient {
     request.set_data(test.data(), test.size());
     request.set_id(modelID);
     request.set_status(ModelStatus::IN_PROGRESS);
-    request.set_allocated_sender(&client);
+    // Pass ownership of client to protobuf message
+    request.set_allocated_sender(client);
 
     if (!writer->Write(request)) {
         // Broken stream.
@@ -195,11 +197,12 @@ class GreeterClient {
     }
     test.shrink_to_fit();
     // Finish writing to stream
-    ModelRequest requestFinal;
-    requestFinal.set_status(ModelStatus::OK);
-    requestFinal.set_id(modelID);
-    requestFinal.set_allocated_sender(&client);
-    writer->Write(requestFinal);
+    //ModelRequest requestFinal;
+    request.clear_status();
+    request.set_status(ModelStatus::OK);
+    // When ModelStatus is OK, the data field should be empty
+    request.clear_data();
+    writer->Write(request);
     writer->WritesDone();
     grpc::Status status = writer->Finish();
 
@@ -214,8 +217,6 @@ class GreeterClient {
       // Print message from response
       std::cout << "Response: " << response.message() << std::endl;
     }
-    request.release_sender();
-    requestFinal.release_sender();
   }
   //**
   // * Update local model with global model as "seed" model.
@@ -284,7 +285,8 @@ class GreeterClient {
     }
     // Print response attribute from fedn::Response
     std::cout << "SendModelUpdate: Response: " << response.response() << std::endl;
-    modelUpdate.release_sender();
+    // Garbage collect the client object.
+    Client *clientCollect = modelUpdate.release_sender();
   }
   /**
    * Generate a random UUID version 4 string.
