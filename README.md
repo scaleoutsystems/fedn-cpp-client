@@ -42,10 +42,10 @@ Next, follow the instructions in the README inside fedn/examples/mnist-keras for
 ## Connect C++ client
 First ask for combiner assignent via the REST-API using the HTTP client:
 
-    cd fedn-cpp/cmake/build
-    ./http-client
+    cd cmake
+    build/http-client
 
-The response contains combiner config.
+The response contains combiner config. Obs if the client returns status code 203 it's probably because the compute package has not been set. 
 Next, start the gRPC client:
 
     ./fedn-grpc
