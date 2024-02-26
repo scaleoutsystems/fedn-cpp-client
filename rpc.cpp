@@ -93,6 +93,8 @@ class GrpcClient {
     request.set_allocated_sender(client);
 
     ClientContext context;
+    // Add metadata to context
+    context.AddMetadata("client", "test");
 
     // Get ClientReader from stream
     std::unique_ptr<ClientReader<TaskRequest> > reader(
@@ -105,6 +107,10 @@ class GrpcClient {
       std::cout << "TaskRequest: TaskType:" << modelUpdate.type() << std::endl;
       if (modelUpdate.type() == StatusType::MODEL_UPDATE) {
         GrpcClient::UpdateLocalModel(modelUpdate.model_id(), modelUpdate.data());
+      }
+      else if (modelUpdate.type() == StatusType::MODEL_VALIDATION) {
+        // TODO: Implement model validation
+        std::cout << "Model validation not implemented, skipping..." << std::endl;
       }
       
     }
