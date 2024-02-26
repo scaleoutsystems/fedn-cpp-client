@@ -28,16 +28,16 @@ This is a prototype and certain configurations (such as client name and combiner
 First deploy e.g FEDn mnist-keras example: https://github.com/scaleoutsystems/fedn/tree/master/examples/mnist-keras
 
     git clone https://github.com/scaleoutsystems/fedn.git
-    git checkout feature/SK-544
-    cd fedn/examples/mnist-keras
+    git checkout feature/cpp
+    cd fedn/examples/mnist-pytorch
 
 start services:
 
-    docker-compose -f ../../docker-compose.yaml up -d --build minio mongo mongo-express api-server dashboard combiner
+    docker-compose -f ../../docker-compose.yaml up -d --build minio mongo mongo-express api-server combiner
 
 It will take some time to build the images, go grab a coffee!!
 
-Next, follow the instructions in the README inside fedn/examples/mnist-keras for section "Preparing the environment, the local data, the compute package and seed model". Once you have the package and the seed model you can either upload these via the dashboard (http://localhost:8090) or using the [APIClient](https://fedn.readthedocs.io/en/develop/fedn.network.api.html#fedn.network.api.client.APIClient) (obs that you need to install the FEDn API to your local environment, for example using a virtual python environment).
+Next, follow the instructions in the README inside fedn/examples/mnist-keras for section "Preparing the environment, the local data, the compute package and seed model". Once you have the package and the seed model you can either upload these via using the [APIClient](https://fedn.readthedocs.io/en/stable/fedn.network.api.html#fedn.network.api.client.APIClient) (obs that you need to install the FEDn API to your local environment, for example using a virtual python environment).
 
 ## Connect C++ client
 First ask for combiner assignent via the REST-API using the HTTP client:
@@ -47,7 +47,7 @@ First ask for combiner assignent via the REST-API using the HTTP client:
 
 The response contains combiner config. Obs if the client returns status code 203 it's probably because the compute package has not been set. 
 Next, start the gRPC client:
-
+    cd build
     ./fedn-grpc
 
 The expected output should be:'
@@ -84,7 +84,7 @@ Close C++ client with Ctrl+C
 
 Stop services:
 
-    cd fedn/examples/mnist-keras
+    cd fedn/examples/mnist-pytorch
     docker-compose -f ../../docker-compose.yaml -f docker-compose.override.yaml down -v
 
 
