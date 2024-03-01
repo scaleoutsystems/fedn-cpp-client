@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package fedn;
+import "google/protobuf/timestamp.proto";
 
 message Response {
     Client sender = 1;
@@ -31,22 +32,19 @@ message Status {
     LogLevel log_level = 3;
     string data = 4;
     string correlation_id = 5;
-    string timestamp = 6;
+    google.protobuf.Timestamp timestamp = 6;
     StatusType type = 7;
     string extra = 8;
+    string session_id = 9;
 
 }
 
-enum Channel {
+enum Queue {
   DEFAULT = 0;
-  MODEL_UPDATE_REQUESTS = 1;
-  MODEL_UPDATES = 2;
-  MODEL_VALIDATION_REQUESTS = 3;
-  MODEL_VALIDATIONS = 4;
-  STATUS = 5; 
+  TASK_QUEUE = 1;
 }
 
-message ModelUpdateRequest {
+message TaskRequest {
   Client sender = 1;
   Client receiver = 2;
   string model_id = 3;
@@ -54,6 +52,8 @@ message ModelUpdateRequest {
   string correlation_id = 5;
   string timestamp = 6;
   string meta = 7;
+  string session_id = 8;
+  StatusType type = 9;
 }
 
 message ModelUpdate {
@@ -67,25 +67,15 @@ message ModelUpdate {
   string config = 8;
 }
 
-message ModelValidationRequest {
-  Client sender = 1;
-  Client receiver = 2;
-  string model_id = 3;
-  string data = 4;
-  string correlation_id = 5;
-  string timestamp = 6; 
-  string meta = 7;
-  bool is_inference = 8;
-}
-
 message ModelValidation {
   Client sender = 1;
   Client receiver = 2;
   string model_id = 3;
   string data = 4;
   string correlation_id = 5;
-  string timestamp = 6;
+  google.protobuf.Timestamp timestamp = 6;
   string meta = 7;
+  string session_id = 8;
 }
 
 enum ModelStatus {
@@ -93,6 +83,7 @@ enum ModelStatus {
   IN_PROGRESS = 1;
   IN_PROGRESS_OK = 2;
   FAILED = 3;
+  UNKNOWN = 4;
 }
 
 message ModelRequest {
@@ -139,7 +130,7 @@ message ClientAvailableMessage {
 
 message ListClientsRequest {
   Client sender = 1;
-  Channel channel = 2;
+  Queue channel = 2;
 }
 
 message ClientList {
@@ -196,17 +187,11 @@ message ControlResponse {
   repeated Parameter parameter = 2;
 }
 
-message ReportResponse {
-  Client sender = 1;
-  repeated Parameter parameter = 2;
-}
-
 service Control {
   rpc Start(ControlRequest) returns (ControlResponse);
   rpc Stop(ControlRequest) returns (ControlResponse);
-  rpc Configure(ControlRequest) returns (ReportResponse);
-  rpc FlushAggregationQueue(ControlRequest) returns (ControlResponse);  
-  rpc Report(ControlRequest) returns (ReportResponse);
+  rpc FlushAggregationQueue(ControlRequest) returns (ControlResponse);
+  rpc SetAggregator(ControlRequest) returns (ControlResponse);
 }
 
 service Reducer {
@@ -228,13 +213,18 @@ message ConnectionResponse {
 }
 
 service Connector {
+    // Stream endpoint for status updates
     rpc AllianceStatusStream (ClientAvailableMessage) returns (stream Status);
 
+    // Report endpoint
     rpc SendStatus (Status) returns (Response);
+//    rpc RegisterClient (ClientAvailableMessage) returns (Response);
+    // List active clients endpoint
     rpc ListActiveClients (ListClientsRequest) returns (ClientList);
 
     rpc AcceptingClients (ConnectionRequest) returns (ConnectionResponse);
 
+    // Client messaging to stay engaged.
     rpc SendHeartbeat (Heartbeat) returns (Response);
 
     rpc ReassignClient (ReassignRequest) returns (Response);
@@ -242,14 +232,11 @@ service Connector {
 }
 
 service Combiner {
-    rpc ModelUpdateRequestStream (ClientAvailableMessage) returns (stream ModelUpdateRequest);
-    rpc ModelUpdateStream (ClientAvailableMessage) returns (stream ModelUpdate);
-    rpc ModelValidationRequestStream (ClientAvailableMessage) returns (stream ModelValidationRequest);
-    rpc ModelValidationStream (ClientAvailableMessage) returns (stream ModelValidation);
 
-    rpc SendModelUpdateRequest (ModelUpdateRequest) returns (Response);
+    // Stream endpoints for training/validation pub/sub
+    rpc TaskStream (ClientAvailableMessage) returns (stream TaskRequest);
+
     rpc SendModelUpdate (ModelUpdate) returns (Response);
-    rpc SendModelValidationRequest (ModelValidationRequest) returns (Response);
     rpc SendModelValidation (ModelValidation) returns (Response);
 
 }

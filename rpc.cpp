@@ -28,18 +28,19 @@ using fedn::Combiner;
 using fedn::ModelService;
 using fedn::Heartbeat;
 using fedn::ModelUpdate;
-using fedn::ModelUpdateRequest;
+using fedn::TaskRequest;
 using fedn::ModelResponse;
 using fedn::ModelRequest;
 using fedn::ModelStatus;
+using fedn::StatusType;
 using fedn::Client;
 using fedn::ClientAvailableMessage;
 using fedn::WORKER;
 using fedn::Response;
 
-class GreeterClient {
+class GrpcClient {
  public:
-  GreeterClient(std::shared_ptr<ChannelInterface> channel)
+  GrpcClient(std::shared_ptr<ChannelInterface> channel)
       : connectorStub_(Connector::NewStub(channel)),
         combinerStub_(Combiner::NewStub(channel)),
         modelserviceStub_(ModelService::NewStub(channel)) {}
@@ -92,20 +93,29 @@ class GreeterClient {
     request.set_allocated_sender(client);
 
     ClientContext context;
+    // Add metadata to context
+    context.AddMetadata("client", "test");
 
     // Get ClientReader from stream
-    std::unique_ptr<ClientReader<ModelUpdateRequest> > reader(
-        combinerStub_->ModelUpdateRequestStream(&context, request));
+    std::unique_ptr<ClientReader<TaskRequest> > reader(
+        combinerStub_->TaskStream(&context, request));
 
     // Read from stream
-    ModelUpdateRequest modelUpdate;
+    TaskRequest modelUpdate;
     while (reader->Read(&modelUpdate)) {
-      std::cout << "ModelUpdateRequest: " << modelUpdate.model_id() << std::endl;
-      GreeterClient::UpdateLocalModel(modelUpdate.model_id(), modelUpdate.data());
+      std::cout << "TaskRequest ModelID: " << modelUpdate.model_id() << std::endl;
+      std::cout << "TaskRequest: TaskType:" << modelUpdate.type() << std::endl;
+      if (modelUpdate.type() == StatusType::MODEL_UPDATE) {
+        GrpcClient::UpdateLocalModel(modelUpdate.model_id(), modelUpdate.data());
+      }
+      else if (modelUpdate.type() == StatusType::MODEL_VALIDATION) {
+        // TODO: Implement model validation
+        std::cout << "Model validation not implemented, skipping..." << std::endl;
+      }
       
     }
     reader->Finish();
-    std::cout << "Disconnecting from ModelUpdateRequestStream" << std::endl;
+    std::cout << "Disconnecting from TaskStream" << std::endl;
   }
   /**
   * Download global model from server.
@@ -227,15 +237,15 @@ class GreeterClient {
   void UpdateLocalModel(const std::string& modelID, const std::string& requestData) {
     std::cout << "Updating local model: " << modelID << std::endl;
     // Download model from server
-    std::string modelData = GreeterClient::DownloadModel(modelID);
+    std::string modelData = GrpcClient::DownloadModel(modelID);
     // Dummy code: update model with modelData
     std::cout << "Dummy code: Updating local model with global model as seed!" << std::endl;
     // Create random UUID4 for model update
-    std::string modelUpdateID = GreeterClient::generateRandomUUID();
+    std::string modelUpdateID = GrpcClient::generateRandomUUID();
     // Upload model to server
-    GreeterClient::UploadModel(modelUpdateID, modelData);
+    GrpcClient::UploadModel(modelUpdateID, modelData);
     // Send model update response to server
-    GreeterClient::SendModelUpdate(modelID, modelUpdateID, requestData);
+    GrpcClient::SendModelUpdate(modelID, modelUpdateID, requestData);
   }
   //**
   // * Send model update message to server.
@@ -325,7 +335,7 @@ int main(int argc, char** argv) {
   std::string target_str = absl::GetFlag(FLAGS_target);
   // We indicate that the channel isn't authenticated (use of
   // InsecureChannelCredentials()).
-  GreeterClient greeter(
+  GrpcClient greeter(
       grpc::CreateChannel(target_str, grpc::InsecureChannelCredentials()));
   greeter.SayHello();
   greeter.ConnectModelUpdateStream();
