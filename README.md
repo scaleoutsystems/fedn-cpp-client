@@ -1,4 +1,4 @@
-# fedn-cpp
+# fedn-cpp-client
 A FEDn client in C++.
 
 Obs that this is a prototype and is still in active development so the interface might change frequently! The purpose of this prototype is to demonstrate how the C++ client can be used to connect to the federated network. 
