@@ -1,7 +1,8 @@
 # fedn-cpp
 A FEDn client in C++.
 
-Obs this is just a prototype and is still very much in development! The perpose of this prototype is to demonstrate the capabilities of the C++ client to connect to the federated network. In the example below, there is no model training being performed on the client. Instead, the global model is downloaded to the client and the same model is sent back to the combiner (demonstrating the connectivity of model updates).
+Obs that this is a prototype and is still in active development so the interface might change frequently! The purpose of this prototype is to demonstrate how the C++ client can be used to connect to the federated network. 
+In the example below, there is no actual model training being performed on the client. Instead, the global model is downloaded to the client and the same model is sent back to the combiner (demonstrating the connectivity of model updates).
 
 ## Build from source
 Follow the gRPC C++ quickstart guide to build and locally install gRPC and Protocol Buffers.
