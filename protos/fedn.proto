@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package fedn;
+package fedn; 
 import "google/protobuf/timestamp.proto";
 
 message Response {

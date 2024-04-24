@@ -15,6 +15,8 @@ include_directories(${YAML_CPP_INCLUDE_DIRS})
 # Find Protobuf installation
 # Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
 option(protobuf_MODULE_COMPATIBLE TRUE)
+# Set CMAKE_PREFIX_PATH to the directory containing protobuf-config.cmake
+set(CMAKE_PREFIX_PATH "~/.local/lib/cmake/")
 find_package(Protobuf CONFIG REQUIRED)
 message(STATUS "Using protobuf ${Protobuf_VERSION}")
 
