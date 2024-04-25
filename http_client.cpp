@@ -67,7 +67,7 @@ public:
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
 
         // Check for HTTP errors
-        if (statusCode != 200) {
+        if (statusCode < 200 || statusCode >= 300) {
             std::cerr << "HTTP error: " << statusCode << std::endl;
             return json(); // Return an empty JSON object in case of an error
         }
