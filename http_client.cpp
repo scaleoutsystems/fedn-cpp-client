@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <stdlib.h>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <yaml-cpp/yaml.h>
@@ -40,14 +41,24 @@ public:
         curl_easy_setopt(curl, CURLOPT_URL, apiUrl.c_str());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonData.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        // allow all redirects
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
         // Set the Content-Type header
         struct curl_slist* headers = nullptr;
         headers = curl_slist_append(headers, "Content-Type: application/json");
 
+        // Get Environment variable for token scheme
+        char* token_scheme;
+        token_scheme = std::getenv("FEDN_AUTH_SCHEME");
+        if (token_scheme == NULL) {
+            token_scheme = (char*) "Token";
+        }
+        std::string fillString = token_scheme + (std::string) " ";
+
         // Set the token as a header if it's provided
         if (!token.empty()) {
-            headers = curl_slist_append(headers, ("Authorization: Token " + token).c_str());
+            headers = curl_slist_append(headers, ("Authorization: " + fillString + token).c_str());
         }
 
         // Set the headers for the POST request
@@ -67,7 +78,7 @@ public:
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
 
         // Check for HTTP errors
-        if (statusCode < 200 || statusCode >= 300) {
+        if (statusCode < 200 || statusCode >= 300){
             std::cerr << "HTTP error: " << statusCode << std::endl;
             return json(); // Return an empty JSON object in case of an error
         }
@@ -80,8 +91,15 @@ public:
 
         // Parse and return the response JSON
         try {
-            json responseJson = json::parse(responseData);
-            return responseJson;
+            if (!responseData.empty() && responseData[0] == '{') {
+                json responseJson = json::parse(responseData);
+                return responseJson;
+            } else {
+                std::cerr << "Invalid or empty response data." << std::endl;
+                // Print the response data
+                std::cout << responseData << std::endl;
+                return json(); // Return an empty JSON object in case of invalid or empty response data
+            }
         } catch (const std::exception& e) {
             std::cerr << "Error parsing response JSON: " << e.what() << std::endl;
             return json(); // Return an empty JSON object in case of parsing error
@@ -137,7 +155,7 @@ int main() {
     if (config["token"]) {
         token = config["token"].as<std::string>();
         // Check if the token is valid
-        if (!token.empty() && !requestData["token"].is_string()) {
+        if (token.empty() && !requestData["token"].is_string()) {
             std::cerr << "Invalid token." << std::endl;
             return 1;
         }
