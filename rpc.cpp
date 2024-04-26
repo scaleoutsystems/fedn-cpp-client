@@ -14,7 +14,7 @@
 #include "fedn.grpc.pb.h"
 #include "fedn.pb.h"
 
-
+ABSL_FLAG(std::string, name, "test", "Name of client, (OBS! Must be same as used in http-client)");
 ABSL_FLAG(std::string, server_host, "localhost:12080", "Server host");
 ABSL_FLAG(std::string, proxy_host, "", "Proxy host");
 ABSL_FLAG(std::string, token, "", "Token for authentication");
@@ -89,7 +89,7 @@ class GrpcClient {
   void SayHello() {
     // Data we are sending to the server.
     Client* client = new Client();
-    client->set_name("test");
+    client->set_name(name_);
     client->set_role(WORKER);
 
     Heartbeat request;
@@ -124,7 +124,7 @@ class GrpcClient {
   void ConnectModelUpdateStream() {
     // Data we are sending to the server.
     Client* client = new Client();
-    client->set_name("test");
+    client->set_name(name_);
     client->set_role(WORKER);
 
     ClientAvailableMessage request;
@@ -133,7 +133,7 @@ class GrpcClient {
 
     ClientContext context;
     // Add metadata to context
-    context.AddMetadata("client", "test");
+    context.AddMetadata("client", name_);
 
     // Get ClientReader from stream
     std::unique_ptr<ClientReader<TaskRequest> > reader(
@@ -222,7 +222,7 @@ class GrpcClient {
 
     // Client
     Client* client = new Client();
-    client->set_name("test");
+    client->set_name(name_);
     client->set_role(WORKER);
 
     // Get ClientWriter from stream
@@ -295,7 +295,7 @@ class GrpcClient {
   void SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config) {
    // Send model update response to server
     Client client;
-    client.set_name("test");
+    client.set_name(name_);
     client.set_role(WORKER);
 
     
@@ -363,6 +363,7 @@ class GrpcClient {
   std::unique_ptr<Connector::Stub> connectorStub_;
   std::unique_ptr<Combiner::Stub> combinerStub_;
   std::unique_ptr<ModelService::Stub> modelserviceStub_;
+  std::string name_ = absl::GetFlag(FLAGS_name);
   static const size_t chunkSize = 1024 * 1024; // 1 MB, change this to suit your needs 
 };
 
