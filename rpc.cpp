@@ -15,7 +15,11 @@
 #include "fedn.pb.h"
 
 
-ABSL_FLAG(std::string, target, "localhost:12080", "Server address");
+ABSL_FLAG(std::string, server_host, "localhost:12080", "Server host");
+ABSL_FLAG(std::string, proxy_host, "", "Proxy host");
+ABSL_FLAG(std::string, token, "", "Token for authentication");
+ABSL_FLAG(std::string, auth_scheme, "Token", "Authentication scheme");
+ABSL_FLAG(bool, insecure, false, "Use an insecure grpc channel");
 
 using grpc::ChannelInterface;
 using grpc::ClientContext;
@@ -37,6 +41,41 @@ using fedn::Client;
 using fedn::ClientAvailableMessage;
 using fedn::WORKER;
 using fedn::Response;
+
+class MyCustomAuthenticator : public grpc::MetadataCredentialsPlugin {
+ public:
+  MyCustomAuthenticator(const grpc::string& ticket) : ticket_(ticket) {}
+
+  grpc::Status GetMetadata(
+      grpc::string_ref service_url, grpc::string_ref method_name,
+      const grpc::AuthContext& channel_auth_context,
+      std::multimap<grpc::string, grpc::string>* metadata) override {
+    metadata->insert(std::make_pair("authorization", ticket_));
+    return grpc::Status::OK;
+  }
+
+ private:
+  grpc::string ticket_;
+};
+
+class CustomMetadata : public grpc::MetadataCredentialsPlugin {
+ public:
+  CustomMetadata(const grpc::string& key, const grpc::string& value)
+      : key_(key), value_(value) {}
+
+  grpc::Status GetMetadata(
+      grpc::string_ref service_url, grpc::string_ref method_name,
+      const grpc::AuthContext& channel_auth_context,
+      std::multimap<grpc::string, grpc::string>* metadata) override {
+    metadata->insert(std::make_pair(key_, value_));
+    return grpc::Status::OK;
+  }
+
+ private:
+  grpc::string key_;
+  grpc::string value_;
+};
+
 
 class GrpcClient {
  public:
@@ -330,14 +369,71 @@ class GrpcClient {
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   // Instantiate the client. It requires a channel, out of which the actual RPCs
-  // are created. This channel models a connection to an endpoint specified by
-  // the argument "--target=" which is the only expected argument.
-  std::string target_str = absl::GetFlag(FLAGS_target);
-  // We indicate that the channel isn't authenticated (use of
-  // InsecureChannelCredentials()).
+  // are created. This channel models a connection to an server specified by
+  // the argument "--target=".
+  std::string host = absl::GetFlag(FLAGS_server_host);
+  std::cout << "Server host: " << host << std::endl;
+
+  // Get the insecure flag
+  bool insecure = absl::GetFlag(FLAGS_insecure);
+  // initialize credentials
+  std::shared_ptr<grpc::ChannelCredentials> creds;
+  if (insecure) {
+    std::cout << "Using insecure channel" << std::endl;
+    // Create an call credentials object for use with an insecure channel
+    creds = grpc::InsecureChannelCredentials();
+  } else {
+    std::cout << "Using secure channel" << std::endl;
+    // Get the token
+    std::string token = absl::GetFlag(FLAGS_token);
+    // check if token is empty
+    if (token.empty()) {
+      std::cerr << "Token is empty, exiting..." << std::endl;
+      return 1;
+    }
+    // Get the auth scheme
+    std::string auth_scheme = absl::GetFlag(FLAGS_auth_scheme);
+    // check if auth_scheme is empty
+    if (auth_scheme.empty()) {
+      std::cerr << "Auth scheme is empty, exiting..." << std::endl;
+      return 1;
+    }
+    // Check if auth_scheme is Token or Bearer
+    if (auth_scheme != "Token" && auth_scheme != "Bearer") {
+      std::cerr << "Invalid auth scheme, exiting..." << std::endl;
+      return 1;
+    }
+    // Create authorization header value string for metadata
+    std::string header_value = auth_scheme + (std::string) " " + token;
+   
+    // Create call credentials
+    auto call_creds = grpc::MetadataCredentialsFromPlugin(
+    std::unique_ptr<grpc::MetadataCredentialsPlugin>(
+        new MyCustomAuthenticator(header_value)));
+
+    // Create channel credentials
+    auto channel_creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
+
+    // Get the server host to metadata
+    auto metadata_creds = grpc::MetadataCredentialsFromPlugin(
+    std::unique_ptr<grpc::MetadataCredentialsPlugin>(
+        new CustomMetadata("grpc-server", host)));
+
+    // Create intermediate composite channel credentials
+    auto inter_creds = grpc::CompositeChannelCredentials(channel_creds, call_creds);
+    // Create composite channel credentials
+    creds = grpc::CompositeChannelCredentials(inter_creds, metadata_creds);
+  }
+  // Check if proxy host is set, and change host to proxy host, server host will be in metadata
+  std::string proxy_host = absl::GetFlag(FLAGS_proxy_host);
+  if (!proxy_host.empty()) {
+    std::cout << "Proxy host: " << proxy_host << std::endl;
+    host = proxy_host;
+  }
+  //Create a channel using the credentials created above
   GrpcClient greeter(
-      grpc::CreateChannel(target_str, grpc::InsecureChannelCredentials()));
+      grpc::CreateChannel(host, creds));
   greeter.SayHello();
   greeter.ConnectModelUpdateStream();
   return 0;
-}
+  }
