@@ -5,6 +5,7 @@
 #include <vector>
 #include <random>
 #include <iomanip>
+#include <fstream>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -13,6 +14,9 @@
 
 #include "fedn.grpc.pb.h"
 #include "fedn.pb.h"
+
+// Include Armadillo for matrix operations
+// #include <mlpack.hpp>
 
 ABSL_FLAG(std::string, name, "test", "Name of client, (OBS! Must be same as used in http-client)");
 ABSL_FLAG(std::string, server_host, "localhost:12080", "Server host");
@@ -209,62 +213,138 @@ class GrpcClient {
     }
 
   /**
-   * Upload local model to server.
+   * Upload local model to server in chunks.
    * 
    * @param modelID The model ID to upload.
    * @param modelData The model data to upload.
+   * @param chunkSize The size of each chunk to upload.
    */
-  void UploadModel(std::string& modelID, std::string& modelData) {
-    // response 
-    ModelResponse response;
-    // context
-    ClientContext context;
+  void UploadModel(std::string& modelID, std::string& modelData, size_t chunkSize) {
+      // response 
+      ModelResponse response;
+      // context
+      ClientContext context;
 
-    // Client
-    Client* client = new Client();
-    client->set_name(name_);
-    client->set_role(WORKER);
+      // Client
+      Client* client = new Client();
+      client->set_name(name_);
+      client->set_role(WORKER);
 
-    // Get ClientWriter from stream
-    std::unique_ptr<ClientWriter<ModelRequest> > writer(
-        modelserviceStub_->Upload(&context, &response));
+      // Get ClientWriter from stream
+      std::unique_ptr<ClientWriter<ModelRequest> > writer(
+          modelserviceStub_->Upload(&context, &response));
 
-    ModelRequest request;
-    std ::string test = modelData;
-    request.set_data(test.data(), test.size());
-    request.set_id(modelID);
-    request.set_status(ModelStatus::IN_PROGRESS);
-    // Pass ownership of client to protobuf message
-    request.set_allocated_sender(client);
+      // Calculate the number of chunks
+      size_t totalSize = modelData.size();
+      size_t offset = 0;
 
-    if (!writer->Write(request)) {
-        // Broken stream.
+      std::cout << "Upload in progress: " << modelID << std::endl;
+
+      while (offset < totalSize) {
+          ModelRequest request;
+          size_t currentChunkSize = std::min(chunkSize, totalSize - offset);
+          request.set_data(modelData.data() + offset, currentChunkSize);
+          request.set_id(modelID);
+          request.set_status(ModelStatus::IN_PROGRESS);
+          // Pass ownership of client to protobuf message only for the first chunk
+          if (offset == 0) {
+              request.set_allocated_sender(client);
+          }
+
+          if (!writer->Write(request)) {
+              // Broken stream.
+              std::cout << "Upload failed for model: " << modelID << std::endl;
+              std::cout << "Disconnecting from UploadStream" << std::endl;
+              grpc::Status status = writer->Finish();
+              return;
+          }
+          std::cout << "Uploading chunk: " << offset << " - " << offset + currentChunkSize << std::endl;
+          offset += currentChunkSize;
+      }
+
+      // Finish writing to stream with final message
+      ModelRequest requestFinal;
+      requestFinal.set_id(modelID);
+      requestFinal.set_status(ModelStatus::OK);
+      writer->Write(requestFinal);
+      writer->WritesDone();
+      grpc::Status status = writer->Finish();
+
+      if (status.ok()) {
+        std::cout << "Upload complete for local model: " << modelID << std::endl;
+        // Print message from response
+        std::cout << "Response: " << response.message() << std::endl;
+      } else {
         std::cout << "Upload failed for model: " << modelID << std::endl;
-        std::cout << "Disconnecting from UploadStream" << std::endl;
-        grpc::Status status = writer->Finish();
-        return;
-    }
-    test.shrink_to_fit();
-    // Finish writing to stream
-    //ModelRequest requestFinal;
-    request.clear_status();
-    request.set_status(ModelStatus::OK);
-    // When ModelStatus is OK, the data field should be empty
-    request.clear_data();
-    writer->Write(request);
-    writer->WritesDone();
-    grpc::Status status = writer->Finish();
+        std::cout << status.error_code() << ": " << status.error_message()
+                  << std::endl;
+        // Print message from response
+        std::cout << "Response: " << response.message() << std::endl;
+      }
+  }
+  //**
+  // * Save model to file.
+  // *
+  // * @param modelData The model data to save.
+  // * @param modelID The model ID to save. Will be used as filename.
+  // * @param path The path to save the model to.
+  void SaveModelToFile(const std::string& modelData, const std::string& modelID, const std::string& path) {
+    // Write the binary string to a file
+    // Create an ofstream object and open the file in binary mode
+    std::ofstream outFile(path + modelID + ".bin", std::ios::binary);
 
-    if (status.ok()) {
-      std::cout << "Upload complete for local model: " << modelID << std::endl;
-      // Print message from response
-      std::cout << "Response: " << response.message() << std::endl;
-    } else {
-      std::cout << "Upload failed for model: " << modelID << std::endl;
-      std::cout << status.error_code() << ": " << status.error_message()
-                << std::endl;
-      // Print message from response
-      std::cout << "Response: " << response.message() << std::endl;
+    // Check if the file was opened successfully
+    if (!outFile) {
+        std::cerr << "Error opening file for writing" << std::endl;
+    }
+
+    // Write the binary string to the file
+    outFile.write(modelData.c_str(), modelData.size());
+
+    // Close the file
+    outFile.close();
+
+    std::cout << "modelData saved to file successfully" << std::endl;
+  }
+  //**
+  // * Load model from file.
+  // *
+  // * @param modelID The model ID to load. Will be used as filename.
+  // * @param path The path to load the model from.
+  // * @return String containing binary data of the model.
+  std::string LoadModelFromFile(const std::string& modelID, const std::string& path) {
+    // Create an ifstream object and open the file in binary mode
+    std::ifstream inFile(path + modelID + ".bin", std::ios::binary);
+    // Check if the file was opened successfully
+    if (!inFile) {
+        std::cerr << "Error opening file for reading" << std::endl;
+    }
+    // Get the length of the file
+    inFile.seekg(0, inFile.end);
+    int length = inFile.tellg();
+    inFile.seekg(0, inFile.beg);
+    // Create a string object to hold the data
+    std::string data(length, '\0');
+    // Read the file
+    inFile.read(&data[0], length);
+    // Close the file
+    inFile.close();
+    // Return the data
+    return data;
+  }
+  //
+  //**
+  // * Delete model from disk.
+  // *
+  // * @param modelID The model ID to delete.
+  // * @param path The path to delete the model from.
+  void DeleteModelFromDisk(const std::string& modelID, const std::string& path) {
+    // Delete the file
+    if (remove((path + modelID + ".bin").c_str()) != 0) {
+        std::cerr << "Error deleting file" << std::endl;
+    }
+    else {
+        std::cout << "File deleted successfully: " << modelID << std::endl;
     }
   }
   //**
@@ -276,15 +356,40 @@ class GrpcClient {
   void UpdateLocalModel(const std::string& modelID, const std::string& requestData) {
     std::cout << "Updating local model: " << modelID << std::endl;
     // Download model from server
+    std::cout << "Downloading model: " << modelID << std::endl;
     std::string modelData = GrpcClient::DownloadModel(modelID);
+    // Save model to file
+    // TODO: model should be saved to a temporary file and chunks should be written to it
+    std::cout << "Saving model to file: " << modelID << std::endl;
+    GrpcClient::SaveModelToFile(modelData, modelID, "./");
     // Dummy code: update model with modelData
     std::cout << "Dummy code: Updating local model with global model as seed!" << std::endl;
+    // Example of loading a matrix from a binary file using Armadillo
+    // arma::mat loadedData;
+    // loadedData.load("./" + modelID + ".bin", arma::raw_binary);
+    // std::cout << "Loaded data: " << loadedData << std::endl;
+    // Update the matrix (model)
+    // loadedData += 1;
     // Create random UUID4 for model update
+    std::cout << "Generating random UUID for model update" << std::endl;
     std::string modelUpdateID = GrpcClient::generateRandomUUID();
+    // Save the matrix as raw binary file
+    // Using Armadillo to save the matrix as a binary file
+    // loadedData.save("./" + modelUpdateID + ".bin", arma::raw_binary);
+    // Using own code to save the matrix as a binary file, dymmy code. Remove if using Armadillo
+    GrpcClient::SaveModelToFile(modelData, modelUpdateID, "./");
+    // Read the binary string from the file
+    // Load model from file
+    std::cout << "Loading model from file: " << modelUpdateID << std::endl;
+    std::string data = GrpcClient::LoadModelFromFile(modelUpdateID, "./");
+
     // Upload model to server
-    GrpcClient::UploadModel(modelUpdateID, modelData);
+    GrpcClient::UploadModel(modelUpdateID, data, GrpcClient::chunkSize);
     // Send model update response to server
     GrpcClient::SendModelUpdate(modelID, modelUpdateID, requestData);
+    // Delete model from disk
+    GrpcClient::DeleteModelFromDisk(modelID, "./");
+    GrpcClient::DeleteModelFromDisk(modelUpdateID, "./");
   }
   //**
   // * Send model update message to server.

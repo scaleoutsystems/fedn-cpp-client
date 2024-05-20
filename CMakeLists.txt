@@ -6,6 +6,7 @@ find_package(CURL REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
+
 include_directories(${YAML_CPP_INCLUDE_DIRS})
 
 # Protobuf and gRPC
@@ -40,6 +41,12 @@ else()
 set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 endif()
 
+# If using Armadillo
+# Ensure that Armadillo is installed on the system
+#set(ARMADILLO_LIBRARY "~/.local/lib/cmake/lib/libarmadillo.so")
+#set(ARMADILLO_INCLUDE_DIR "~/.local/lib/cmake/include")
+#set(ARMADILLO_INCLUDE_DIRS "/usr/include")
+
 # Proto file for project
 get_filename_component(fedn_proto "protos/fedn.proto" ABSOLUTE)
 get_filename_component(fedn_proto_path "${fedn_proto}" PATH)
@@ -60,7 +67,12 @@ add_custom_command(
       DEPENDS "${fedn_proto}")
 
 # Include generated *.pb.h files
-include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+# if ${ARMADILLO_INCLUDE_DIR} is set, include it
+if(DEFINED ${ARMADILLO_INCLUDE_DIR})
+  include_directories("${CMAKE_CURRENT_BINARY_DIR}" "${ARMADILLO_INCLUDE_DIRS}" "${ARMADILLO_INCLUDE_DIR}")
+else()
+  include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+endif()
 
 # fedn_grpc_proto
 add_library(fedn_grpc_proto
@@ -85,10 +97,9 @@ add_executable(http-client ${SOURCES})
 target_link_libraries(http-client PRIVATE CURL::libcurl yaml-cpp ${YAML_CPP_LIBRARIES} nlohmann_json::nlohmann_json)
 
 add_executable(fedn-grpc "rpc.cpp")
-target_link_libraries(fedn-grpc
-    fedn_grpc_proto
-    absl::flags
-    absl::flags_parse
-    ${_REFLECTION}
-    ${_GRPC_GRPCPP}
-    ${_PROTOBUF_LIBPROTOBUF})
+# if ${ARMADILLO_LIBRARY} is set, link it
+if(DEFINED ${ARMADILLO_LIBRARY})
+  target_link_libraries(fedn-grpc fedn_grpc_proto absl::flags absl::flags_parse ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF} ${ARMADILLO_LIBRARY})
+else()
+  target_link_libraries(fedn-grpc fedn_grpc_proto absl::flags absl::flags_parse ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
+endif()
