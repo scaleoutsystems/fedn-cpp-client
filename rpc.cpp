@@ -5,6 +5,7 @@
 #include <vector>
 #include <random>
 #include <iomanip>
+#include <fstream>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -212,63 +213,74 @@ class GrpcClient {
     }
 
   /**
-   * Upload local model to server.
+   * Upload local model to server in chunks.
    * 
    * @param modelID The model ID to upload.
    * @param modelData The model data to upload.
+   * @param chunkSize The size of each chunk to upload.
    */
-  void UploadModel(std::string& modelID, std::string& modelData) {
-    // response 
-    ModelResponse response;
-    // context
-    ClientContext context;
+  void UploadModel(std::string& modelID, std::string& modelData, size_t chunkSize) {
+      // response 
+      ModelResponse response;
+      // context
+      ClientContext context;
 
-    // Client
-    Client* client = new Client();
-    client->set_name(name_);
-    client->set_role(WORKER);
+      // Client
+      Client* client = new Client();
+      client->set_name(name_);
+      client->set_role(WORKER);
 
-    // Get ClientWriter from stream
-    std::unique_ptr<ClientWriter<ModelRequest> > writer(
-        modelserviceStub_->Upload(&context, &response));
+      // Get ClientWriter from stream
+      std::unique_ptr<ClientWriter<ModelRequest> > writer(
+          modelserviceStub_->Upload(&context, &response));
 
-    ModelRequest request;
-    std ::string test = modelData;
-    request.set_data(test.data(), test.size());
-    request.set_id(modelID);
-    request.set_status(ModelStatus::IN_PROGRESS);
-    // Pass ownership of client to protobuf message
-    request.set_allocated_sender(client);
+      // Calculate the number of chunks
+      size_t totalSize = modelData.size();
+      size_t offset = 0;
 
-    if (!writer->Write(request)) {
-        // Broken stream.
+      std::cout << "Upload in progress: " << modelID << std::endl;
+
+      while (offset < totalSize) {
+          ModelRequest request;
+          size_t currentChunkSize = std::min(chunkSize, totalSize - offset);
+          request.set_data(modelData.data() + offset, currentChunkSize);
+          request.set_id(modelID);
+          request.set_status(ModelStatus::IN_PROGRESS);
+          // Pass ownership of client to protobuf message only for the first chunk
+          if (offset == 0) {
+              request.set_allocated_sender(client);
+          }
+
+          if (!writer->Write(request)) {
+              // Broken stream.
+              std::cout << "Upload failed for model: " << modelID << std::endl;
+              std::cout << "Disconnecting from UploadStream" << std::endl;
+              grpc::Status status = writer->Finish();
+              return;
+          }
+          std::cout << "Uploading chunk: " << offset << " - " << offset + currentChunkSize << std::endl;
+          offset += currentChunkSize;
+      }
+
+      // Finish writing to stream with final message
+      ModelRequest requestFinal;
+      requestFinal.set_id(modelID);
+      requestFinal.set_status(ModelStatus::OK);
+      writer->Write(requestFinal);
+      writer->WritesDone();
+      grpc::Status status = writer->Finish();
+
+      if (status.ok()) {
+        std::cout << "Upload complete for local model: " << modelID << std::endl;
+        // Print message from response
+        std::cout << "Response: " << response.message() << std::endl;
+      } else {
         std::cout << "Upload failed for model: " << modelID << std::endl;
-        std::cout << "Disconnecting from UploadStream" << std::endl;
-        grpc::Status status = writer->Finish();
-        return;
-    }
-    test.shrink_to_fit();
-    // Finish writing to stream
-    //ModelRequest requestFinal;
-    request.clear_status();
-    request.set_status(ModelStatus::OK);
-    // When ModelStatus is OK, the data field should be empty
-    request.clear_data();
-    writer->Write(request);
-    writer->WritesDone();
-    grpc::Status status = writer->Finish();
-
-    if (status.ok()) {
-      std::cout << "Upload complete for local model: " << modelID << std::endl;
-      // Print message from response
-      std::cout << "Response: " << response.message() << std::endl;
-    } else {
-      std::cout << "Upload failed for model: " << modelID << std::endl;
-      std::cout << status.error_code() << ": " << status.error_message()
-                << std::endl;
-      // Print message from response
-      std::cout << "Response: " << response.message() << std::endl;
-    }
+        std::cout << status.error_code() << ": " << status.error_message()
+                  << std::endl;
+        // Print message from response
+        std::cout << "Response: " << response.message() << std::endl;
+      }
   }
   //**
   // * Save model to file.
@@ -332,7 +344,7 @@ class GrpcClient {
         std::cerr << "Error deleting file" << std::endl;
     }
     else {
-        std::cout << "File deleted successfully" << std::endl;
+        std::cout << "File deleted successfully: " << modelID << std::endl;
     }
   }
   //**
@@ -372,7 +384,7 @@ class GrpcClient {
     std::string data = GrpcClient::LoadModelFromFile(modelUpdateID, "./");
 
     // Upload model to server
-    GrpcClient::UploadModel(modelUpdateID, data);
+    GrpcClient::UploadModel(modelUpdateID, data, GrpcClient::chunkSize);
     // Send model update response to server
     GrpcClient::SendModelUpdate(modelID, modelUpdateID, requestData);
     // Delete model from disk
