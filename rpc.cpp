@@ -155,6 +155,10 @@ class GrpcClient {
         // TODO: Implement model validation
         std::cout << "Model validation not implemented, skipping..." << std::endl;
       }
+      else if (modelUpdate.type() == StatusType::INFERENCE) {
+        // TODO: Implement model inference
+        std::cout << "Model inference not implemented, skipping..." << std::endl;
+      }
       
     }
     reader->Finish();
