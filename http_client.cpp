@@ -52,7 +52,7 @@ public:
         char* token_scheme;
         token_scheme = std::getenv("FEDN_AUTH_SCHEME");
         if (token_scheme == NULL) {
-            token_scheme = (char*) "Token";
+            token_scheme = (char*) "Bearer";
         }
         std::string fillString = token_scheme + (std::string) " ";
 
