@@ -6,6 +6,8 @@
 #include <random>
 #include <iomanip>
 #include <fstream>
+#include <chrono>
+#include <thread>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -90,7 +92,7 @@ class GrpcClient {
 
   // Assembles the client's payload, sends it and presents the response back
   // from the server.
-  void SayHello() {
+  void HeartBeat() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
@@ -476,6 +478,13 @@ class GrpcClient {
   static const size_t chunkSize = 1024 * 1024; // 1 MB, change this to suit your needs 
 };
 
+void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
+  while (true) {
+      client->HeartBeat();
+      std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
+  }
+}
+
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   // Instantiate the client. It requires a channel, out of which the actual RPCs
@@ -552,7 +561,10 @@ int main(int argc, char** argv) {
   std::shared_ptr<ChannelInterface> channel = grpc::CreateCustomChannel(
       host, creds, args);
   GrpcClient greeter(channel);
-  greeter.SayHello();
+  // Create a thread for the HeartBeat function that runs every 10 seconds
+  std::thread HeartBeatThread(SendIntervalHeartBeat, &greeter, 10);
   greeter.ConnectModelUpdateStream();
+  // Join the thread to ensure the main program waits for it
+  HeartBeatThread.join();
   return 0;
   }
