@@ -6,6 +6,8 @@
 #include <random>
 #include <iomanip>
 #include <fstream>
+#include <chrono>
+#include <thread>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -90,7 +92,7 @@ class GrpcClient {
 
   // Assembles the client's payload, sends it and presents the response back
   // from the server.
-  void SayHello() {
+  void HeartBeat() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
@@ -154,6 +156,10 @@ class GrpcClient {
       else if (modelUpdate.type() == StatusType::MODEL_VALIDATION) {
         // TODO: Implement model validation
         std::cout << "Model validation not implemented, skipping..." << std::endl;
+      }
+      else if (modelUpdate.type() == StatusType::INFERENCE) {
+        // TODO: Implement model inference
+        std::cout << "Model inference not implemented, skipping..." << std::endl;
       }
       
     }
@@ -472,6 +478,13 @@ class GrpcClient {
   static const size_t chunkSize = 1024 * 1024; // 1 MB, change this to suit your needs 
 };
 
+void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
+  while (true) {
+      client->HeartBeat();
+      std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
+  }
+}
+
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   // Instantiate the client. It requires a channel, out of which the actual RPCs
@@ -537,9 +550,21 @@ int main(int argc, char** argv) {
     host = proxy_host;
   }
   //Create a channel using the credentials created above
-  GrpcClient greeter(
-      grpc::CreateChannel(host, creds));
-  greeter.SayHello();
+  grpc::ChannelArguments args;
+  // Sample way of setting keepalive arguments on the client channel. Here we
+  // are configuring a keepalive time period of 20 seconds, with a timeout of 10
+  // seconds. Additionally, pings will be sent even if there are no calls in
+  // flight on an active connection.
+  args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 20 * 1000 /*20 sec*/);
+  args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10 * 1000 /*10 sec*/);
+  args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
+  std::shared_ptr<ChannelInterface> channel = grpc::CreateCustomChannel(
+      host, creds, args);
+  GrpcClient greeter(channel);
+  // Create a thread for the HeartBeat function that runs every 10 seconds
+  std::thread HeartBeatThread(SendIntervalHeartBeat, &greeter, 10);
   greeter.ConnectModelUpdateStream();
+  // Join the thread to ensure the main program waits for it
+  HeartBeatThread.join();
   return 0;
   }
