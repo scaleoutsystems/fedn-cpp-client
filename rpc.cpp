@@ -21,6 +21,7 @@
 // #include <mlpack.hpp>
 
 ABSL_FLAG(std::string, name, "test", "Name of client, (OBS! Must be same as used in http-client)");
+ABSL_FLAG(std::string, id, "test123", "ID of client");
 ABSL_FLAG(std::string, server_host, "localhost:12080", "Server host");
 ABSL_FLAG(std::string, proxy_host, "", "Proxy host");
 ABSL_FLAG(std::string, token, "", "Token for authentication");
@@ -97,6 +98,7 @@ class GrpcClient {
     Client* client = new Client();
     client->set_name(name_);
     client->set_role(WORKER);
+    client->set_client_id(id_);
 
     Heartbeat request;
     // Pass ownership of client to protobuf message
@@ -475,6 +477,7 @@ class GrpcClient {
   std::unique_ptr<Combiner::Stub> combinerStub_;
   std::unique_ptr<ModelService::Stub> modelserviceStub_;
   std::string name_ = absl::GetFlag(FLAGS_name);
+  std::string id_ = absl::GetFlag(FLAGS_id);
   static const size_t chunkSize = 1024 * 1024; // 1 MB, change this to suit your needs 
 };
 

@@ -129,7 +129,8 @@ int main() {
     // Read requestData from the config
     json requestData;
     // Get client_id from the config
-    requestData["client_id"] = config["name"].as<std::string>();
+    requestData["client_id"] = config["client_id"].as<std::string>();
+    requestData["name"] = config["name"].as<std::string>();
 
     // Check if the client_id is valid
     if (!requestData["client_id"].is_string()) {
