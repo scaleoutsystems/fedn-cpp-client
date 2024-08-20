@@ -134,6 +134,7 @@ class GrpcClient {
     Client* client = new Client();
     client->set_name(name_);
     client->set_role(WORKER);
+    client->set_client_id(id_);
 
     ClientAvailableMessage request;
     // Pass ownership of client to protobuf message
@@ -237,6 +238,7 @@ class GrpcClient {
       Client* client = new Client();
       client->set_name(name_);
       client->set_role(WORKER);
+      client->set_client_id(id_);
 
       // Get ClientWriter from stream
       std::unique_ptr<ClientWriter<ModelRequest> > writer(
@@ -410,6 +412,7 @@ class GrpcClient {
     Client client;
     client.set_name(name_);
     client.set_role(WORKER);
+    client.set_client_id(id_);
 
     
     ModelUpdate modelUpdate;
