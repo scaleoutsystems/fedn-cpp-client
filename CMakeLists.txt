@@ -3,7 +3,10 @@ project(hw-cpp VERSION 1.0 DESCRIPTION "hw client in C++")
 
 # Find required dependencies for HTTP client
 find_package(CURL REQUIRED)
+# set(YAML_CPP_DIR "<path-to-yaml-cpp>")
 find_package(yaml-cpp REQUIRED)
+# include_directories(${YAML_CPP_DIR}/include)
+# link_directories(${YAML_CPP_DIR}/lib)
 find_package(nlohmann_json REQUIRED)
 
 

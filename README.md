@@ -11,8 +11,12 @@ Obs that you don't have to follow the helloworld example, but it's a good way to
 https://grpc.io/docs/languages/cpp/quickstart/
 
 ### Other dependencies
+
+#### On Linux
     sudo apt-get install libcurl4-openssl-dev nlohmann-json3-dev libyaml-cpp-dev
 
+#### On Mac
+    brew install curl nlohmann-json yaml-cpp
 
 ### Build the C++ client
 
@@ -21,6 +25,13 @@ https://grpc.io/docs/languages/cpp/quickstart/
     cmake ../..
     make -j 4
     popd
+
+**Note:** If you are running on Mac, you might need to uncomment these lines in `CMakeLists.txt` and change `<path-to-yaml-cpp>` to the path where `yaml-cpp` is located on your machine:
+
+    set(YAML_CPP_DIR "<path-to-yaml-cpp>")
+    ...
+    include_directories(${YAML_CPP_DIR}/include)
+    link_directories(${YAML_CPP_DIR}/lib)
 
 
 ## Starting Servers
