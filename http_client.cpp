@@ -131,6 +131,7 @@ int main() {
     // Get client_id from the config
     requestData["client_id"] = config["client_id"].as<std::string>();
     requestData["name"] = config["name"].as<std::string>();
+    requestData["package"] = "remote";
 
     // Check if the client_id is valid
     if (!requestData["client_id"].is_string()) {
