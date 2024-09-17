@@ -491,7 +491,7 @@ void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
   }
 }
 
-int main(int argc, char** argv) {
+std::shared_ptr<ChannelInterface> SetupChannel(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   // Instantiate the client. It requires a channel, out of which the actual RPCs
   // are created. This channel models a connection to an server specified by
@@ -513,20 +513,17 @@ int main(int argc, char** argv) {
     std::string token = absl::GetFlag(FLAGS_token);
     // check if token is empty
     if (token.empty()) {
-      std::cerr << "Token is empty, exiting..." << std::endl;
-      return 1;
+      throw std::runtime_error("Token is empty, exiting...");
     }
     // Get the auth scheme
     std::string auth_scheme = absl::GetFlag(FLAGS_auth_scheme);
     // check if auth_scheme is empty
     if (auth_scheme.empty()) {
-      std::cerr << "Auth scheme is empty, exiting..." << std::endl;
-      return 1;
+      throw std::runtime_error("Auth scheme is empty, exiting...");
     }
     // Check if auth_scheme is Token or Bearer
     if (auth_scheme != "Token" && auth_scheme != "Bearer") {
-      std::cerr << "Invalid auth scheme, exiting..." << std::endl;
-      return 1;
+      throw std::runtime_error("Invalid auth scheme, exiting...");
     }
     // Create authorization header value string for metadata
     std::string header_value = auth_scheme + (std::string) " " + token;
@@ -566,11 +563,31 @@ int main(int argc, char** argv) {
   args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
   std::shared_ptr<ChannelInterface> channel = grpc::CreateCustomChannel(
       host, creds, args);
-  GrpcClient greeter(channel);
+
+  return channel;
+}
+
+int RunGrcpClient(GrpcClient& greeter) {
   // Create a thread for the HeartBeat function that runs every 10 seconds
   std::thread HeartBeatThread(SendIntervalHeartBeat, &greeter, 10);
   greeter.ConnectModelUpdateStream();
   // Join the thread to ensure the main program waits for it
   HeartBeatThread.join();
   return 0;
+}
+
+int main(int argc, char** argv) {
+  try {
+    // Setup gRPC channel
+    std::shared_ptr<ChannelInterface> channel = SetupChannel(argc, argv);
+
+    // Create client
+    GrpcClient greeter(channel);
+
+    // Run client
+    return RunGrcpClient(greeter);
+  } catch (const std::runtime_error& e) {
+    std::cerr << e.what() << std::endl;
+    return 1;
   }
+}
