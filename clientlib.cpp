@@ -28,6 +28,9 @@ using json = nlohmann::json;
 #include "fedn.grpc.pb.h"
 #include "fedn.pb.h"
 
+// Imports - CppClient
+#include "clientlib.h"
+
 // Include Armadillo for matrix operations
 // #include <mlpack.hpp>
 
@@ -68,109 +71,126 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* out
     return totalSize;
 }
 
-class HttpClient {
-public:
-    HttpClient(const std::string& apiUrl, const std::string& token = "") : apiUrl(apiUrl), token(token) {
-        curl = curl_easy_init();
-        if (!curl) {
-            std::cerr << "Error initializing libcurl." << std::endl;
-            std::exit(1);
-        }
+// Debugging function to print CURL list
+void printCurlHeaders(struct curl_slist* headers) {
+    struct curl_slist* current = headers;  // Start at the head of the list
+    while (current != nullptr) {
+        std::cout << current->data << std::endl;  // Print the string at the current node
+        current = current->next;  // Move to the next node in the list
+    }
+}
+
+HttpClient::HttpClient(const std::string& apiUrl, const std::string& token = "") : apiUrl(apiUrl), token(token) {
+    curl = curl_easy_init();
+    if (!curl) {
+        std::cerr << "Error initializing libcurl." << std::endl;
+        std::exit(1);
+    }
+}
+
+HttpClient::~HttpClient() {
+    if (curl) {
+        curl_easy_cleanup(curl);
+    }
+}
+
+json HttpClient::assign(const json& requestData) {
+    // Print the request data
+    std::cout << "DEBUG Request data dump(4): " << requestData.dump(4) << std::endl;
+
+    // Print token
+    std::cout << "DEBUG Token: " << token << std::endl;
+    
+    // Convert the JSON data to a string
+    std::string jsonData = requestData.dump();
+
+    // Print the JSON data
+    std::cout << "DEBUG JSON data: " << jsonData << std::endl;
+
+    // add endpoint /add_client to the apiUrl
+    apiUrl += "/add_client";
+
+    // Set libcurl options for the POST request
+    curl_easy_setopt(curl, CURLOPT_URL, apiUrl.c_str());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonData.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    // allow all redirects
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    // Set the Content-Type header
+    struct curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    // Get Environment variable for token scheme
+    char* token_scheme;
+    token_scheme = std::getenv("FEDN_AUTH_SCHEME");
+    if (token_scheme == NULL) {
+        token_scheme = (char*) "Bearer";
+    }
+    std::string fillString = token_scheme + (std::string) " ";
+
+    // Set the token as a header if it's provided
+    if (!token.empty()) {
+        headers = curl_slist_append(headers, ("Authorization: " + fillString + token).c_str());
+        std::cout << "DEBUG Complete headers:" << std::endl;
+        printCurlHeaders(headers);
     }
 
-    ~HttpClient() {
-        if (curl) {
-            curl_easy_cleanup(curl);
-        }
+    // Set the headers for the POST request
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    // Response data will be stored here
+    std::string responseData;
+
+    // Set the response data string as the write callback parameter
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseData);
+
+    // Perform the HTTP POST request
+    CURLcode res = curl_easy_perform(curl);
+
+    // Print the response data
+    std::cout << "DEBUG Response data: " << responseData << std::endl;
+
+    // Get status code
+    long statusCode;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
+
+    // Check for HTTP errors
+    if (statusCode < 200 || statusCode >= 300){
+        std::cerr << "HTTP error: " << statusCode << std::endl;
+        return json(); // Return an empty JSON object in case of an error
     }
 
-    json assign(const json& requestData) {
-        // Convert the JSON data to a string
-        std::string jsonData = requestData.dump();
-
-        // add endpoint /add_client to the apiUrl
-        apiUrl += "/add_client";
-
-        // Set libcurl options for the POST request
-        curl_easy_setopt(curl, CURLOPT_URL, apiUrl.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonData.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        // allow all redirects
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-        // Set the Content-Type header
-        struct curl_slist* headers = nullptr;
-        headers = curl_slist_append(headers, "Content-Type: application/json");
-
-        // Get Environment variable for token scheme
-        char* token_scheme;
-        token_scheme = std::getenv("FEDN_AUTH_SCHEME");
-        if (token_scheme == NULL) {
-            token_scheme = (char*) "Bearer";
-        }
-        std::string fillString = token_scheme + (std::string) " ";
-
-        // Set the token as a header if it's provided
-        if (!token.empty()) {
-            headers = curl_slist_append(headers, ("Authorization: " + fillString + token).c_str());
-        }
-
-        // Set the headers for the POST request
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-        // Response data will be stored here
-        std::string responseData;
-
-        // Set the response data string as the write callback parameter
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseData);
-
-        // Perform the HTTP POST request
-        CURLcode res = curl_easy_perform(curl);
-
-        // Get status code
-        long statusCode;
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
-
-        // Check for HTTP errors
-        if (statusCode < 200 || statusCode >= 300){
-            std::cerr << "HTTP error: " << statusCode << std::endl;
-            return json(); // Return an empty JSON object in case of an error
-        }
-
-        // Check for errors
-        if (res != CURLE_OK) {
-            std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
-            return json(); // Return an empty JSON object in case of an error
-        }
-
-        // Parse and return the response JSON
-        try {
-            if (!responseData.empty() && responseData[0] == '{') {
-                json responseJson = json::parse(responseData);
-                return responseJson;
-            } else {
-                std::cerr << "Invalid or empty response data." << std::endl;
-                // Print the response data
-                std::cout << responseData << std::endl;
-                return json(); // Return an empty JSON object in case of invalid or empty response data
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "Error parsing response JSON: " << e.what() << std::endl;
-            return json(); // Return an empty JSON object in case of parsing error
-        }
+    // Check for errors
+    if (res != CURLE_OK) {
+        std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+        return json(); // Return an empty JSON object in case of an error
     }
 
-private:
-    CURL* curl;
-    std::string apiUrl;
-    std::string token;
-};
+    // Parse and return the response JSON
+    try {
+        if (!responseData.empty() && responseData[0] == '{') {
+            json responseJson = json::parse(responseData);
+            return responseJson;
+        } else {
+            std::cerr << "Invalid or empty response data." << std::endl;
+            // Print the response data
+            std::cout << responseData << std::endl;
+            return json(); // Return an empty JSON object in case of invalid or empty response data
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error parsing response JSON: " << e.what() << std::endl;
+        return json(); // Return an empty JSON object in case of parsing error
+    }
+}
 
 json validateHttpRequestData(YAML::Node config) {
     // Read requestData from the config
+    std::cout << "Reading request data from config" << std::endl;
     json requestData;
     requestData["client_id"] = config["client_id"].as<std::string>();
     requestData["name"] = config["name"].as<std::string>();
+    requestData["token"] = config["token"].as<std::string>();
     requestData["package"] = "remote";
 
     // Check if the client_id is valid
@@ -194,7 +214,7 @@ json validateHttpRequestData(YAML::Node config) {
 
 std::string readApiUrl(YAML::Node config) {
     // Read API endpoint URL from the config
-    const std::string apiUrl = config["discover_address"].as<std::string>();
+    const std::string apiUrl = config["discover_host"].as<std::string>();
 
     // Check if the API URL is valid
     if (apiUrl.empty()) {
@@ -256,16 +276,14 @@ class CustomMetadata : public grpc::MetadataCredentialsPlugin {
 };
 
 
-class GrpcClient {
- public:
-  GrpcClient(std::shared_ptr<ChannelInterface> channel)
+GrpcClient::GrpcClient(std::shared_ptr<ChannelInterface> channel)
       : connectorStub_(Connector::NewStub(channel)),
         combinerStub_(Combiner::NewStub(channel)),
         modelserviceStub_(ModelService::NewStub(channel)) {}
 
   // Assembles the client's payload, sends it and presents the response back
   // from the server.
-  void HeartBeat() {
+void GrpcClient::HeartBeat() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
@@ -301,7 +319,7 @@ class GrpcClient {
     }
   }
 
-  void ConnectModelUpdateStream() {
+void GrpcClient::ConnectModelUpdateStream() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
@@ -346,7 +364,7 @@ class GrpcClient {
   *
   * @return A vector of char containing the model data.
   */
-  std::string DownloadModel(const std::string& modelID) {
+std::string GrpcClient::DownloadModel(const std::string& modelID) {
 
     // request 
     ModelRequest request;
@@ -400,7 +418,7 @@ class GrpcClient {
    * @param modelData The model data to upload.
    * @param chunkSize The size of each chunk to upload.
    */
-  void UploadModel(std::string& modelID, std::string& modelData, size_t chunkSize) {
+void GrpcClient::UploadModel(std::string& modelID, std::string& modelData, size_t chunkSize) {
       // response 
       ModelResponse response;
       // context
@@ -470,7 +488,7 @@ class GrpcClient {
   // * @param modelData The model data to save.
   // * @param modelID The model ID to save. Will be used as filename.
   // * @param path The path to save the model to.
-  void SaveModelToFile(const std::string& modelData, const std::string& modelID, const std::string& path) {
+void GrpcClient::SaveModelToFile(const std::string& modelData, const std::string& modelID, const std::string& path) {
     // Write the binary string to a file
     // Create an ofstream object and open the file in binary mode
     std::ofstream outFile(path + modelID + ".bin", std::ios::binary);
@@ -494,7 +512,7 @@ class GrpcClient {
   // * @param modelID The model ID to load. Will be used as filename.
   // * @param path The path to load the model from.
   // * @return String containing binary data of the model.
-  std::string LoadModelFromFile(const std::string& modelID, const std::string& path) {
+std::string GrpcClient::LoadModelFromFile(const std::string& modelID, const std::string& path) {
     // Create an ifstream object and open the file in binary mode
     std::ifstream inFile(path + modelID + ".bin", std::ios::binary);
     // Check if the file was opened successfully
@@ -520,7 +538,7 @@ class GrpcClient {
   // *
   // * @param modelID The model ID to delete.
   // * @param path The path to delete the model from.
-  void DeleteModelFromDisk(const std::string& modelID, const std::string& path) {
+void GrpcClient::DeleteModelFromDisk(const std::string& modelID, const std::string& path) {
     // Delete the file
     if (remove((path + modelID + ".bin").c_str()) != 0) {
         std::cerr << "Error deleting file" << std::endl;
@@ -535,7 +553,7 @@ class GrpcClient {
   // *
   // * @param modelID The model ID (Global) to update local model with.
   // * @param requestData The data field from ModelUpdate request, should contain the round config
-  virtual void UpdateLocalModel(const std::string& modelID, const std::string& requestData) {
+void GrpcClient::UpdateLocalModel(const std::string& modelID, const std::string& requestData) {
     std::cout << "Updating local model: " << modelID << std::endl;
     // Download model from server
     std::cout << "Downloading model: " << modelID << std::endl;
@@ -579,7 +597,7 @@ class GrpcClient {
   // * @param modelID The model ID (Global) to send model update for.
   // * @param modelUpdateID The model update ID (Local) to send model update for.
   // * @param config The round config
-  void SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config) {
+void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config) {
    // Send model update response to server
     Client client;
     client.set_name(name_);
@@ -630,7 +648,7 @@ class GrpcClient {
    *
    * @return A random UUID version 4 string.
    */
-  std::string generateRandomUUID() {
+std::string GrpcClient::generateRandomUUID() {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, 15);
@@ -647,14 +665,13 @@ class GrpcClient {
     return ss.str();
 }
 
- private:
-  std::unique_ptr<Connector::Stub> connectorStub_;
-  std::unique_ptr<Combiner::Stub> combinerStub_;
-  std::unique_ptr<ModelService::Stub> modelserviceStub_;
-  std::string name_ = absl::GetFlag(FLAGS_name);
-  std::string id_ = absl::GetFlag(FLAGS_id);
-  static const size_t chunkSize = 1024 * 1024; // 1 MB, change this to suit your needs 
-};
+void GrpcClient::SetName(const std::string& name) {
+    name_ = name;
+}
+
+void GrpcClient::SetId(const std::string& id) {
+    id_ = id;
+}
 
 void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
   while (true) {
@@ -663,144 +680,175 @@ void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
   }
 }
 
+//Debugging function to print YAML data
+void printYAML(const YAML::Node& node, int indent = 0) {
+    std::string indentStr(indent, ' ');  // Create an indentation string
+
+    // Check if the node is a scalar
+    if (node.IsScalar()) {
+        std::cout << indentStr << "Scalar: " << node.as<std::string>() << " (type: string)" << std::endl;
+    } 
+    // Check if the node is a sequence (list)
+    else if (node.IsSequence()) {
+        std::cout << indentStr << "Sequence: " << std::endl;
+        for (std::size_t i = 0; i < node.size(); ++i) {
+            std::cout << indentStr << "- ";
+            printYAML(node[i], indent + 2);
+        }
+    } 
+    // Check if the node is a map (key-value pairs)
+    else if (node.IsMap()) {
+        std::cout << indentStr << "Map: " << std::endl;
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            std::cout << indentStr << "Key: " << it->first.as<std::string>() << std::endl;
+            printYAML(it->second, indent + 2);  // Recursively print the value with increased indentation
+        }
+    } 
+    // Check if the node is null
+    else if (node.IsNull()) {
+        std::cout << indentStr << "Null" << std::endl;
+    } 
+    // Handle any other types if necessary
+    else {
+        std::cout << indentStr << "Unknown type" << std::endl;
+    }
+}
+
 // Code - Client
-class CppClient {
-public:
-    CppClient(int argc, char** argv) {
-        // Parse command line arguments
-        readCommandLineArguments(argc, argv);
+CppClient::CppClient(int argc, char** argv) {
+    // Parse command line arguments
+    readCommandLineArguments(argc, argv);
 
-        // Read HTTP configuration from the "client.yaml" file
-        const std::string configFile = "../client.yaml";
-        YAML::Node config = YAML::LoadFile(configFile);
-        httpRequestData = validateHttpRequestData(config);
+    // Read HTTP configuration from the "client.yaml" file
+    const std::string configFile = "../client.yaml";
+    YAML::Node config = YAML::LoadFile(configFile);
+    // printYAML(config);
+    httpRequestData = validateHttpRequestData(config);
 
-        // Read API endpoint URL from the config
-        const std::string apiUrl = readApiUrl(config);
-        
-        // Check if there is a "token" key in the config
-        std::string token = readToken(config);
-
-        // Create a Client instance with the API URL and token (if provided)
-        httpClient = std::make_unique<HttpClient>(apiUrl, token);
-
-        // Assign
-        json grpcChannelConfig = assign();
-
-        // Create gRPC channel
-        createChannel(grpcChannelConfig);
-    }
-
-    std::shared_ptr<ChannelInterface> getChannel() {
-        return channel;
-    }
-
-    void run(std::shared_ptr<GrpcClient> customGrpcClient) {
-        // Add the custom gRPC client to the Client object
-        grpcClient = customGrpcClient;
-
-        // Start heart beat thread and listen to model update requests
-        std::thread HeartBeatThread(SendIntervalHeartBeat, grpcClient.get(), 10);
-        grpcClient->ConnectModelUpdateStream();
-        HeartBeatThread.join();
-    }
-
-private:
-    std::shared_ptr<GrpcClient> grpcClient;
-    std::unique_ptr<HttpClient> httpClient;
-    std::shared_ptr<ChannelInterface> channel;
-    json httpRequestData;
-    json commandLineArguments;
-    // json httpResponseData;
-    // json grpcChannelConfig;
+    // Read API endpoint URL from the config
+    const std::string apiUrl = readApiUrl(config);
     
-    json assign() {
-        // Request assignment to combiner
-        json httpResponseData = httpClient->assign(httpRequestData);
-        // Setup gRPC channel configuration
-        json grpcChannelConfig;
-        grpcChannelConfig["insecure"] = commandLineArguments["insecure"];
-        grpcChannelConfig["server_host"] = httpResponseData["host"];
-        grpcChannelConfig["proxy_host"] = httpResponseData["fqdn"];
-        grpcChannelConfig["token"] = httpRequestData["token"];
-        grpcChannelConfig["auth_scheme"] = commandLineArguments["auth_scheme"];
-        return grpcChannelConfig;
+    // Check if there is a "token" key in the config
+    std::string token = readToken(config);
+
+    // Create a Client instance with the API URL and token (if provided)
+    httpClient = std::make_unique<HttpClient>(apiUrl, token);
+
+    // Assign
+    json grpcChannelConfig = assign();
+
+    // Create gRPC channel
+    createChannel(grpcChannelConfig);
+}
+
+std::shared_ptr<ChannelInterface> CppClient::getChannel() {
+    return channel;
+}
+
+void CppClient::run(std::shared_ptr<GrpcClient> customGrpcClient) {
+    // Add the custom gRPC client to the Client object
+    grpcClient = customGrpcClient;
+
+    // Set name, id and chunk size
+    grpcClient->SetName(absl::GetFlag(FLAGS_name));
+    grpcClient->SetId(absl::GetFlag(FLAGS_id));
+
+    // Start heart beat thread and listen to model update requests
+    std::thread HeartBeatThread(SendIntervalHeartBeat, grpcClient.get(), 10);
+    grpcClient->ConnectModelUpdateStream();
+    HeartBeatThread.join();
+}
+
+json CppClient::assign() {
+    // Request assignment to combiner
+    json httpResponseData = httpClient->assign(httpRequestData);
+
+    // Pretty print of the response
+    std::cout << "Response: " << httpResponseData.dump(4) << std::endl;
+
+    // Setup gRPC channel configuration
+    json grpcChannelConfig;
+    grpcChannelConfig["insecure"] = commandLineArguments["insecure"];
+    grpcChannelConfig["host"] = httpResponseData["host"];
+    grpcChannelConfig["proxy_host"] = httpResponseData["fqdn"];
+    grpcChannelConfig["token"] = httpRequestData["token"];
+    grpcChannelConfig["auth_scheme"] = commandLineArguments["auth_scheme"];
+    return grpcChannelConfig;
+}
+
+void CppClient::createChannel(json grpcChannelConfig) {
+    // Instantiate the client. It requires a channel, out of which the actual RPCs
+    // are created. This channel models a connection to an server specified by
+    // the argument "--target=".
+
+    std::cout << "Server host: " << grpcChannelConfig["host"] << std::endl;
+
+    // initialize credentials
+    std::shared_ptr<grpc::ChannelCredentials> creds;
+    if (grpcChannelConfig["insecure"]) {
+    std::cout << "Using insecure channel" << std::endl;
+    // Create an call credentials object for use with an insecure channel
+    creds = grpc::InsecureChannelCredentials();
+    } else {
+    std::cout << "Using secure channel" << std::endl;
+    // check if token is empty
+    if (grpcChannelConfig["token"].empty()) {
+        throw std::runtime_error("Token is empty, exiting...");
     }
-
-    void createChannel(json grpcChannelConfig) {
-        // Instantiate the client. It requires a channel, out of which the actual RPCs
-        // are created. This channel models a connection to an server specified by
-        // the argument "--target=".
-
-        std::cout << "Server host: " << grpcChannelConfig["host"] << std::endl;
-
-        // initialize credentials
-        std::shared_ptr<grpc::ChannelCredentials> creds;
-        if (grpcChannelConfig["insecure"]) {
-        std::cout << "Using insecure channel" << std::endl;
-        // Create an call credentials object for use with an insecure channel
-        creds = grpc::InsecureChannelCredentials();
-        } else {
-        std::cout << "Using secure channel" << std::endl;
-        // check if token is empty
-        if (grpcChannelConfig["token"].empty()) {
-            throw std::runtime_error("Token is empty, exiting...");
-        }
-        // check if auth_scheme is empty
-        if (grpcChannelConfig["auth_scheme"].empty()) {
-            throw std::runtime_error("Auth scheme is empty, exiting...");
-        }
-        // Check if auth_scheme is Token or Bearer
-        if (grpcChannelConfig["auth_scheme"] != "Token" && grpcChannelConfig["auth_scheme"] != "Bearer") {
-            throw std::runtime_error("Invalid auth scheme, exiting...");
-        }
-        // Create authorization header value string for metadata
-        std::string header_value = grpcChannelConfig["auth_scheme"].get<std::string>() + (std::string) " " + grpcChannelConfig["token"].get<std::string>();
-
-        // Create call credentials
-        auto call_creds = grpc::MetadataCredentialsFromPlugin(
-        std::unique_ptr<grpc::MetadataCredentialsPlugin>(
-            new MyCustomAuthenticator(header_value)));
-
-        // Create channel credentials
-        auto channel_creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
-
-        // Get the server host to metadata
-        auto metadata_creds = grpc::MetadataCredentialsFromPlugin(
-        std::unique_ptr<grpc::MetadataCredentialsPlugin>(
-            new CustomMetadata("grpc-server", grpcChannelConfig["host"])));
-
-        // Create intermediate composite channel credentials
-        auto inter_creds = grpc::CompositeChannelCredentials(channel_creds, call_creds);
-        // Create composite channel credentials
-        creds = grpc::CompositeChannelCredentials(inter_creds, metadata_creds);
-        }
-        // Check if proxy host is set, and change host to proxy host, server host will be in metadata
-        if (!grpcChannelConfig["proxy_host"].empty()) {
-        std::cout << "Proxy host: " << grpcChannelConfig["proxy_host"] << std::endl;
-        grpcChannelConfig["host"] = grpcChannelConfig["proxy_host"];
-        }
-        //Create a channel using the credentials created above
-        grpc::ChannelArguments args;
-
-        // Sample way of setting keepalive arguments on the client channel. Here we
-        // are configuring a keepalive time period of 20 seconds, with a timeout of 10
-        // seconds. Additionally, pings will be sent even if there are no calls in
-        // flight on an active connection.
-        args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 20 * 1000 /*20 sec*/);
-        args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10 * 1000 /*10 sec*/);
-        args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
-
-        channel = grpc::CreateCustomChannel(grpcChannelConfig["host"], creds, args);
+    // check if auth_scheme is empty
+    if (grpcChannelConfig["auth_scheme"].empty()) {
+        throw std::runtime_error("Auth scheme is empty, exiting...");
     }
-
-    void readCommandLineArguments(int argc, char** argv) {
-        commandLineArguments["name"] = absl::GetFlag(FLAGS_name);
-        commandLineArguments["id"] = absl::GetFlag(FLAGS_id);
-        commandLineArguments["server_host"] = absl::GetFlag(FLAGS_server_host);
-        commandLineArguments["proxy_host"] = absl::GetFlag(FLAGS_proxy_host);
-        commandLineArguments["token"] = absl::GetFlag(FLAGS_token);
-        commandLineArguments["auth_scheme"] = absl::GetFlag(FLAGS_auth_scheme);
-        commandLineArguments["insecure"] = absl::GetFlag(FLAGS_insecure);
+    // Check if auth_scheme is Token or Bearer
+    if (grpcChannelConfig["auth_scheme"] != "Token" && grpcChannelConfig["auth_scheme"] != "Bearer") {
+        throw std::runtime_error("Invalid auth scheme, exiting...");
     }
-};
+    // Create authorization header value string for metadata
+    std::string header_value = grpcChannelConfig["auth_scheme"].get<std::string>() + (std::string) " " + grpcChannelConfig["token"].get<std::string>();
+
+    // Create call credentials
+    auto call_creds = grpc::MetadataCredentialsFromPlugin(
+    std::unique_ptr<grpc::MetadataCredentialsPlugin>(
+        new MyCustomAuthenticator(header_value)));
+
+    // Create channel credentials
+    auto channel_creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
+
+    // Get the server host to metadata
+    auto metadata_creds = grpc::MetadataCredentialsFromPlugin(
+    std::unique_ptr<grpc::MetadataCredentialsPlugin>(
+        new CustomMetadata("grpc-server", grpcChannelConfig["host"])));
+
+    // Create intermediate composite channel credentials
+    auto inter_creds = grpc::CompositeChannelCredentials(channel_creds, call_creds);
+    // Create composite channel credentials
+    creds = grpc::CompositeChannelCredentials(inter_creds, metadata_creds);
+    }
+    // Check if proxy host is set, and change host to proxy host, server host will be in metadata
+    if (!grpcChannelConfig["proxy_host"].empty()) {
+    std::cout << "Proxy host: " << grpcChannelConfig["proxy_host"] << std::endl;
+    grpcChannelConfig["host"] = grpcChannelConfig["proxy_host"];
+    }
+    //Create a channel using the credentials created above
+    grpc::ChannelArguments args;
+
+    // Sample way of setting keepalive arguments on the client channel. Here we
+    // are configuring a keepalive time period of 20 seconds, with a timeout of 10
+    // seconds. Additionally, pings will be sent even if there are no calls in
+    // flight on an active connection.
+    args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 20 * 1000 /*20 sec*/);
+    args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10 * 1000 /*10 sec*/);
+    args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
+
+    channel = grpc::CreateCustomChannel(grpcChannelConfig["host"], creds, args);
+}
+
+void CppClient::readCommandLineArguments(int argc, char** argv) {
+    commandLineArguments["name"] = absl::GetFlag(FLAGS_name);
+    commandLineArguments["id"] = absl::GetFlag(FLAGS_id);
+    commandLineArguments["server_host"] = absl::GetFlag(FLAGS_server_host);
+    commandLineArguments["proxy_host"] = absl::GetFlag(FLAGS_proxy_host);
+    commandLineArguments["token"] = absl::GetFlag(FLAGS_token);
+    commandLineArguments["auth_scheme"] = absl::GetFlag(FLAGS_auth_scheme);
+    commandLineArguments["insecure"] = absl::GetFlag(FLAGS_insecure);
+}
