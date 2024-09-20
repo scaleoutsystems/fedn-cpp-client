@@ -39,6 +39,7 @@ public:
     HttpClient(const std::string& apiUrl, const std::string& token);
     ~HttpClient();
     json assign(const json& requestData);
+    std::string getToken();
 
 private:
     CURL* curl;

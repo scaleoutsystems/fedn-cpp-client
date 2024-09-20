@@ -39,8 +39,9 @@ ABSL_FLAG(std::string, id, "test123", "ID of client");
 ABSL_FLAG(std::string, server_host, "localhost:12080", "Server host");
 ABSL_FLAG(std::string, proxy_host, "", "Proxy host");
 ABSL_FLAG(std::string, token, "", "Token for authentication");
-ABSL_FLAG(std::string, auth_scheme, "Token", "Authentication scheme");
+ABSL_FLAG(std::string, auth_scheme, "Bearer", "Authentication scheme");
 ABSL_FLAG(bool, insecure, false, "Use an insecure grpc channel");
+ABSL_FLAG(std::string, in, "../../client.yaml", "Client configuration file");
 
 using grpc::ChannelInterface;
 using grpc::ClientContext;
@@ -71,15 +72,6 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* out
     return totalSize;
 }
 
-// Debugging function to print CURL list
-void printCurlHeaders(struct curl_slist* headers) {
-    struct curl_slist* current = headers;  // Start at the head of the list
-    while (current != nullptr) {
-        std::cout << current->data << std::endl;  // Print the string at the current node
-        current = current->next;  // Move to the next node in the list
-    }
-}
-
 HttpClient::HttpClient(const std::string& apiUrl, const std::string& token = "") : apiUrl(apiUrl), token(token) {
     curl = curl_easy_init();
     if (!curl) {
@@ -95,17 +87,8 @@ HttpClient::~HttpClient() {
 }
 
 json HttpClient::assign(const json& requestData) {
-    // Print the request data
-    std::cout << "DEBUG Request data dump(4): " << requestData.dump(4) << std::endl;
-
-    // Print token
-    std::cout << "DEBUG Token: " << token << std::endl;
-    
     // Convert the JSON data to a string
     std::string jsonData = requestData.dump();
-
-    // Print the JSON data
-    std::cout << "DEBUG JSON data: " << jsonData << std::endl;
 
     // add endpoint /add_client to the apiUrl
     apiUrl += "/add_client";
@@ -132,8 +115,6 @@ json HttpClient::assign(const json& requestData) {
     // Set the token as a header if it's provided
     if (!token.empty()) {
         headers = curl_slist_append(headers, ("Authorization: " + fillString + token).c_str());
-        std::cout << "DEBUG Complete headers:" << std::endl;
-        printCurlHeaders(headers);
     }
 
     // Set the headers for the POST request
@@ -147,9 +128,6 @@ json HttpClient::assign(const json& requestData) {
 
     // Perform the HTTP POST request
     CURLcode res = curl_easy_perform(curl);
-
-    // Print the response data
-    std::cout << "DEBUG Response data: " << responseData << std::endl;
 
     // Get status code
     long statusCode;
@@ -184,13 +162,16 @@ json HttpClient::assign(const json& requestData) {
     }
 }
 
+std::string HttpClient::getToken() {
+    return token;
+}
+
 json validateHttpRequestData(YAML::Node config) {
     // Read requestData from the config
     std::cout << "Reading request data from config" << std::endl;
     json requestData;
     requestData["client_id"] = config["client_id"].as<std::string>();
     requestData["name"] = config["name"].as<std::string>();
-    requestData["token"] = config["token"].as<std::string>();
     requestData["package"] = "remote";
 
     // Check if the client_id is valid
@@ -680,53 +661,19 @@ void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
   }
 }
 
-//Debugging function to print YAML data
-void printYAML(const YAML::Node& node, int indent = 0) {
-    std::string indentStr(indent, ' ');  // Create an indentation string
-
-    // Check if the node is a scalar
-    if (node.IsScalar()) {
-        std::cout << indentStr << "Scalar: " << node.as<std::string>() << " (type: string)" << std::endl;
-    } 
-    // Check if the node is a sequence (list)
-    else if (node.IsSequence()) {
-        std::cout << indentStr << "Sequence: " << std::endl;
-        for (std::size_t i = 0; i < node.size(); ++i) {
-            std::cout << indentStr << "- ";
-            printYAML(node[i], indent + 2);
-        }
-    } 
-    // Check if the node is a map (key-value pairs)
-    else if (node.IsMap()) {
-        std::cout << indentStr << "Map: " << std::endl;
-        for (auto it = node.begin(); it != node.end(); ++it) {
-            std::cout << indentStr << "Key: " << it->first.as<std::string>() << std::endl;
-            printYAML(it->second, indent + 2);  // Recursively print the value with increased indentation
-        }
-    } 
-    // Check if the node is null
-    else if (node.IsNull()) {
-        std::cout << indentStr << "Null" << std::endl;
-    } 
-    // Handle any other types if necessary
-    else {
-        std::cout << indentStr << "Unknown type" << std::endl;
-    }
-}
-
 // Code - Client
 CppClient::CppClient(int argc, char** argv) {
     // Parse command line arguments
     readCommandLineArguments(argc, argv);
 
     // Read HTTP configuration from the "client.yaml" file
-    const std::string configFile = "../client.yaml";
+    const std::string configFile = commandLineArguments["in"];
     YAML::Node config = YAML::LoadFile(configFile);
     // printYAML(config);
     httpRequestData = validateHttpRequestData(config);
 
     // Read API endpoint URL from the config
-    const std::string apiUrl = readApiUrl(config);
+    const std::string apiUrl = "https://" + readApiUrl(config);
     
     // Check if there is a "token" key in the config
     std::string token = readToken(config);
@@ -750,8 +697,8 @@ void CppClient::run(std::shared_ptr<GrpcClient> customGrpcClient) {
     grpcClient = customGrpcClient;
 
     // Set name, id and chunk size
-    grpcClient->SetName(absl::GetFlag(FLAGS_name));
-    grpcClient->SetId(absl::GetFlag(FLAGS_id));
+    grpcClient->SetName(httpRequestData["name"]);
+    grpcClient->SetId(httpRequestData["client_id"]);
 
     // Start heart beat thread and listen to model update requests
     std::thread HeartBeatThread(SendIntervalHeartBeat, grpcClient.get(), 10);
@@ -771,7 +718,7 @@ json CppClient::assign() {
     grpcChannelConfig["insecure"] = commandLineArguments["insecure"];
     grpcChannelConfig["host"] = httpResponseData["host"];
     grpcChannelConfig["proxy_host"] = httpResponseData["fqdn"];
-    grpcChannelConfig["token"] = httpRequestData["token"];
+    grpcChannelConfig["token"] = httpClient->getToken();
     grpcChannelConfig["auth_scheme"] = commandLineArguments["auth_scheme"];
     return grpcChannelConfig;
 }
@@ -844,6 +791,7 @@ void CppClient::createChannel(json grpcChannelConfig) {
 }
 
 void CppClient::readCommandLineArguments(int argc, char** argv) {
+    absl::ParseCommandLine(argc, argv);
     commandLineArguments["name"] = absl::GetFlag(FLAGS_name);
     commandLineArguments["id"] = absl::GetFlag(FLAGS_id);
     commandLineArguments["server_host"] = absl::GetFlag(FLAGS_server_host);
@@ -851,4 +799,5 @@ void CppClient::readCommandLineArguments(int argc, char** argv) {
     commandLineArguments["token"] = absl::GetFlag(FLAGS_token);
     commandLineArguments["auth_scheme"] = absl::GetFlag(FLAGS_auth_scheme);
     commandLineArguments["insecure"] = absl::GetFlag(FLAGS_insecure);
+    commandLineArguments["in"] = absl::GetFlag(FLAGS_in);
 }
