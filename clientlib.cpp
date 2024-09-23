@@ -325,7 +325,7 @@ void GrpcClient::ConnectModelUpdateStream() {
       std::cout << "TaskRequest ModelID: " << modelUpdate.model_id() << std::endl;
       std::cout << "TaskRequest: TaskType:" << modelUpdate.type() << std::endl;
       if (modelUpdate.type() == StatusType::MODEL_UPDATE) {
-        GrpcClient::UpdateLocalModel(modelUpdate.model_id(), modelUpdate.data());
+        this->UpdateLocalModel(modelUpdate.model_id(), modelUpdate.data());
       }
       else if (modelUpdate.type() == StatusType::MODEL_VALIDATION) {
         // TODO: Implement model validation

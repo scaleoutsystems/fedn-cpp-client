@@ -6,6 +6,7 @@ public:
     
     void UpdateLocalModel(const std::string& modelID, const std::string& requestData) override {
         // Custom model update code
+        std::cout << "Custom model update code" << std::endl;
     }
 };
 
