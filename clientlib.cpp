@@ -28,7 +28,7 @@ using json = nlohmann::json;
 #include "fedn.grpc.pb.h"
 #include "fedn.pb.h"
 
-// Imports - CppClient
+// Imports - FednClient
 #include "clientlib.h"
 
 // Include Armadillo for matrix operations
@@ -164,33 +164,6 @@ json HttpClient::assign(const json& requestData) {
 
 std::string HttpClient::getToken() {
     return token;
-}
-
-json validateHttpRequestData(YAML::Node config) {
-    // Read requestData from the config
-    std::cout << "Reading request data from config" << std::endl;
-    json requestData;
-    requestData["client_id"] = config["client_id"].as<std::string>();
-    requestData["name"] = config["name"].as<std::string>();
-    requestData["package"] = "remote";
-
-    // Check if the client_id is valid
-    if (!requestData["client_id"].is_string()) {
-        throw std::runtime_error("Invalid client_id.");
-    }
-    
-    // Check if preferred_combiner is in the config, else use default empty string
-    if (config["preferred_combiner"]) {
-        requestData["preferred_combiner"] = config["preferred_combiner"].as<std::string>();
-        // Check if the preferred_combiner is valid
-        if (!requestData["preferred_combiner"].is_string()) {
-            throw std::runtime_error("Invalid preferred_combiner.");
-        }
-    } else {
-        requestData["preferred_combiner"] = "";
-    }
-
-    return requestData;
 }
 
 std::string readApiUrl(YAML::Node config) {
@@ -661,16 +634,72 @@ void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
   }
 }
 
+std::map<std::string, std::string> readCombinerConfig(YAML::Node configFile) {
+    // Read HTTP configuration from the "client.yaml" file
+    std::map<std::string, std::string> combinerConfig;
+
+    if (configFile["combiner"]) {
+        combinerConfig["host"] = configFile["combiner"].as<std::string>();
+    }
+    if (configFile["proxy_server"]) {
+        combinerConfig["proxy_host"] = configFile["proxy_server"].as<std::string>();
+    }
+    if (configFile["insecure"]) {
+        combinerConfig["insecure"] = configFile["insecure"].as<std::string>();
+    }
+    else {
+        combinerConfig["insecure"] = "false";
+    }
+    if (configFile["token"]) {
+        combinerConfig["token"] = configFile["token"].as<std::string>();
+    }
+    if (configFile["auth_scheme"]) {
+        combinerConfig["auth_scheme"] = configFile["auth_scheme"].as<std::string>();
+    }
+    else {
+        combinerConfig["auth_scheme"] = "Bearer";
+    }
+
+    return combinerConfig;
+}
+
+json readControllerConfig(YAML::Node config) {
+    // Read requestData from the config
+    std::cout << "Reading HTTP request data from config file" << std::endl;
+    json controllerConfig;
+    controllerConfig["client_id"] = config["client_id"].as<std::string>();
+    controllerConfig["name"] = config["name"].as<std::string>();
+    controllerConfig["package"] = "remote";
+
+    // Check if the client_id is valid
+    if (!controllerConfig["client_id"].is_string()) {
+        throw std::runtime_error("Invalid client_id.");
+    }
+    
+    // Check if preferred_combiner is in the config, else use default empty string
+    if (config["preferred_combiner"]) {
+        controllerConfig["preferred_combiner"] = config["preferred_combiner"].as<std::string>();
+        // Check if the preferred_combiner is valid
+        if (!controllerConfig["preferred_combiner"].is_string()) {
+            throw std::runtime_error("Invalid preferred_combiner.");
+        }
+    } else {
+        controllerConfig["preferred_combiner"] = "";
+    }
+
+    return controllerConfig;
+}
+
 // Code - Client
-CppClient::CppClient(int argc, char** argv) {
+FednClient::FednClient(std::string configFilePath) {
     // Parse command line arguments
-    readCommandLineArguments(argc, argv);
+    // readCommandLineArguments(argc, argv);
+    // const std::string configFile = commandLineArguments["in"];
 
     // Read HTTP configuration from the "client.yaml" file
-    const std::string configFile = commandLineArguments["in"];
-    YAML::Node config = YAML::LoadFile(configFile);
-    // printYAML(config);
-    httpRequestData = validateHttpRequestData(config);
+    YAML::Node config = YAML::LoadFile(configFilePath);
+    controllerConfig = readControllerConfig(config);
+    combinerConfig = readCombinerConfig(config);
 
     // Read API endpoint URL from the config
     const std::string apiUrl = "https://" + readApiUrl(config);
@@ -679,26 +708,43 @@ CppClient::CppClient(int argc, char** argv) {
     std::string token = readToken(config);
 
     // Create a Client instance with the API URL and token (if provided)
-    httpClient = std::make_unique<HttpClient>(apiUrl, token);
+    httpClient = std::make_shared<HttpClient>(apiUrl, token);
 
-    // Assign
-    json grpcChannelConfig = assign();
+    // // Assign
+    // json combinerConfig = assign();
 
-    // Create gRPC channel
-    createChannel(grpcChannelConfig);
+    // // Create gRPC channel
+    // setupGrpcChannel(combinerConfig);
 }
 
-std::shared_ptr<ChannelInterface> CppClient::getChannel() {
+std::map<std::string, std::string> FednClient::getCombinerConfig() {
+    std::cout << "DEBUG Combiner configuration PRE-ASSIGNMENT:" << std::endl;
+    for (auto const& x : combinerConfig) {
+        std::cout << "  " << x.first << ": " << x.second << std::endl;
+    }
+    
+    if (combinerConfig.count("host") == 0 || combinerConfig.count("proxy_host") == 0) {
+        // Assign to combiner
+        combinerConfig = assign();
+        std::cout << "DEBUG Combiner configuration POST-ASSIGNMENT:" << std::endl;
+        for (auto const& x : combinerConfig) {
+            std::cout << "  " << x.first << ": " << x.second << std::endl;
+        }
+    }
+    return combinerConfig;
+}
+
+std::shared_ptr<ChannelInterface> FednClient::getChannel() {
     return channel;
 }
 
-void CppClient::run(std::shared_ptr<GrpcClient> customGrpcClient) {
-    // Add the custom gRPC client to the Client object
+void FednClient::run(std::shared_ptr<GrpcClient> customGrpcClient) {
+    // Add the custom gRPC client to the FednClient object
     grpcClient = customGrpcClient;
 
     // Set name, id and chunk size
-    grpcClient->SetName(httpRequestData["name"]);
-    grpcClient->SetId(httpRequestData["client_id"]);
+    grpcClient->SetName(controllerConfig["name"]);
+    grpcClient->SetId(controllerConfig["client_id"]);
 
     // Start heart beat thread and listen to model update requests
     std::thread HeartBeatThread(SendIntervalHeartBeat, grpcClient.get(), 10);
@@ -706,75 +752,77 @@ void CppClient::run(std::shared_ptr<GrpcClient> customGrpcClient) {
     HeartBeatThread.join();
 }
 
-json CppClient::assign() {
+std::map<std::string, std::string> FednClient::assign() {
     // Request assignment to combiner
-    json httpResponseData = httpClient->assign(httpRequestData);
+    json httpResponseData = httpClient->assign(controllerConfig);
 
     // Pretty print of the response
     std::cout << "Response: " << httpResponseData.dump(4) << std::endl;
 
     // Setup gRPC channel configuration
-    json grpcChannelConfig;
-    grpcChannelConfig["insecure"] = commandLineArguments["insecure"];
-    grpcChannelConfig["host"] = httpResponseData["host"];
-    grpcChannelConfig["proxy_host"] = httpResponseData["fqdn"];
-    grpcChannelConfig["token"] = httpClient->getToken();
-    grpcChannelConfig["auth_scheme"] = commandLineArguments["auth_scheme"];
-    return grpcChannelConfig;
+    // combinerConfig["insecure"] = commandLineArguments["insecure"];
+    combinerConfig["host"] = httpResponseData["host"];
+    combinerConfig["proxy_host"] = httpResponseData["fqdn"];
+    combinerConfig["token"] = httpClient->getToken();
+    // combinerConfig["auth_scheme"] = commandLineArguments["auth_scheme"];
+
+
+    return combinerConfig;
 }
 
-void CppClient::createChannel(json grpcChannelConfig) {
+std::shared_ptr<ChannelInterface> FednClient::setupGrpcChannel(std::map<std::string, std::string> combinerConfig) {
+    // TODO Egen funktion
     // Instantiate the client. It requires a channel, out of which the actual RPCs
     // are created. This channel models a connection to an server specified by
     // the argument "--target=".
 
-    std::cout << "Server host: " << grpcChannelConfig["host"] << std::endl;
+    std::cout << "Server host: " << combinerConfig["host"] << std::endl;
 
     // initialize credentials
     std::shared_ptr<grpc::ChannelCredentials> creds;
-    if (grpcChannelConfig["insecure"]) {
-    std::cout << "Using insecure channel" << std::endl;
-    // Create an call credentials object for use with an insecure channel
-    creds = grpc::InsecureChannelCredentials();
+    if (combinerConfig["insecure"] == "true") {
+        std::cout << "Using insecure channel" << std::endl;
+        // Create an call credentials object for use with an insecure channel
+        creds = grpc::InsecureChannelCredentials();
     } else {
-    std::cout << "Using secure channel" << std::endl;
-    // check if token is empty
-    if (grpcChannelConfig["token"].empty()) {
-        throw std::runtime_error("Token is empty, exiting...");
-    }
-    // check if auth_scheme is empty
-    if (grpcChannelConfig["auth_scheme"].empty()) {
-        throw std::runtime_error("Auth scheme is empty, exiting...");
-    }
-    // Check if auth_scheme is Token or Bearer
-    if (grpcChannelConfig["auth_scheme"] != "Token" && grpcChannelConfig["auth_scheme"] != "Bearer") {
-        throw std::runtime_error("Invalid auth scheme, exiting...");
-    }
-    // Create authorization header value string for metadata
-    std::string header_value = grpcChannelConfig["auth_scheme"].get<std::string>() + (std::string) " " + grpcChannelConfig["token"].get<std::string>();
+        std::cout << "Using secure channel" << std::endl;
+        // check if token is empty
+        if (combinerConfig["token"].empty()) {
+            throw std::runtime_error("Token is empty, exiting...");
+        }
+        // check if auth_scheme is empty
+        if (combinerConfig["auth_scheme"].empty()) {
+            throw std::runtime_error("Auth scheme is empty, exiting...");
+        }
+        // Check if auth_scheme is Token or Bearer
+        if (combinerConfig["auth_scheme"] != "Token" && combinerConfig["auth_scheme"] != "Bearer") {
+            throw std::runtime_error("Invalid auth scheme, exiting...");
+        }
+        // Create authorization header value string for metadata
+        std::string header_value = combinerConfig["auth_scheme"] + (std::string) " " + combinerConfig["token"];
 
-    // Create call credentials
-    auto call_creds = grpc::MetadataCredentialsFromPlugin(
-    std::unique_ptr<grpc::MetadataCredentialsPlugin>(
-        new MyCustomAuthenticator(header_value)));
+        // Create call credentials
+        auto call_creds = grpc::MetadataCredentialsFromPlugin(
+        std::unique_ptr<grpc::MetadataCredentialsPlugin>(
+            new MyCustomAuthenticator(header_value)));
 
-    // Create channel credentials
-    auto channel_creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
+        // Create channel credentials
+        auto channel_creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
 
-    // Get the server host to metadata
-    auto metadata_creds = grpc::MetadataCredentialsFromPlugin(
-    std::unique_ptr<grpc::MetadataCredentialsPlugin>(
-        new CustomMetadata("grpc-server", grpcChannelConfig["host"])));
+        // Get the server host to metadata
+        auto metadata_creds = grpc::MetadataCredentialsFromPlugin(
+        std::unique_ptr<grpc::MetadataCredentialsPlugin>(
+            new CustomMetadata("grpc-server", combinerConfig["host"])));
 
-    // Create intermediate composite channel credentials
-    auto inter_creds = grpc::CompositeChannelCredentials(channel_creds, call_creds);
-    // Create composite channel credentials
-    creds = grpc::CompositeChannelCredentials(inter_creds, metadata_creds);
+        // Create intermediate composite channel credentials
+        auto inter_creds = grpc::CompositeChannelCredentials(channel_creds, call_creds);
+        // Create composite channel credentials
+        creds = grpc::CompositeChannelCredentials(inter_creds, metadata_creds);
     }
     // Check if proxy host is set, and change host to proxy host, server host will be in metadata
-    if (!grpcChannelConfig["proxy_host"].empty()) {
-    std::cout << "Proxy host: " << grpcChannelConfig["proxy_host"] << std::endl;
-    grpcChannelConfig["host"] = grpcChannelConfig["proxy_host"];
+    if (!combinerConfig["proxy_host"].empty()) {
+        std::cout << "Proxy host: " << combinerConfig["proxy_host"] << std::endl;
+        combinerConfig["host"] = combinerConfig["proxy_host"];
     }
     //Create a channel using the credentials created above
     grpc::ChannelArguments args;
@@ -787,17 +835,47 @@ void CppClient::createChannel(json grpcChannelConfig) {
     args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10 * 1000 /*10 sec*/);
     args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
 
-    channel = grpc::CreateCustomChannel(grpcChannelConfig["host"], creds, args);
+    channel = grpc::CreateCustomChannel(combinerConfig["host"], creds, args);
+
+    return channel;
 }
 
-void CppClient::readCommandLineArguments(int argc, char** argv) {
-    absl::ParseCommandLine(argc, argv);
-    commandLineArguments["name"] = absl::GetFlag(FLAGS_name);
-    commandLineArguments["id"] = absl::GetFlag(FLAGS_id);
-    commandLineArguments["server_host"] = absl::GetFlag(FLAGS_server_host);
-    commandLineArguments["proxy_host"] = absl::GetFlag(FLAGS_proxy_host);
-    commandLineArguments["token"] = absl::GetFlag(FLAGS_token);
-    commandLineArguments["auth_scheme"] = absl::GetFlag(FLAGS_auth_scheme);
-    commandLineArguments["insecure"] = absl::GetFlag(FLAGS_insecure);
-    commandLineArguments["in"] = absl::GetFlag(FLAGS_in);
+std::shared_ptr<GrpcClient> FednClient::getGrpcClient() {
+    return grpcClient;
 }
+
+std::shared_ptr<HttpClient> FednClient::getHttpClient() {
+    return httpClient;
+}
+
+void FednClient::setAuthScheme(std::string authScheme) {
+    combinerConfig["auth_scheme"] = authScheme;
+}
+
+void FednClient::setHost(std::string host) {
+    combinerConfig["host"] = host;
+}
+
+void FednClient::setInsecure(bool insecure) {
+    combinerConfig["insecure"] = insecure ? "true" : "false";
+}
+
+void FednClient::setProxyHost(std::string proxyHost) {
+    combinerConfig["proxy_host"] = proxyHost;
+}
+
+void FednClient::setToken(std::string token) {
+    combinerConfig["token"] = token;
+}
+
+// void FednClient::readCommandLineArguments(int argc, char** argv) {
+//     absl::ParseCommandLine(argc, argv);
+//     commandLineArguments["name"] = absl::GetFlag(FLAGS_name);
+//     commandLineArguments["id"] = absl::GetFlag(FLAGS_id);
+//     commandLineArguments["server_host"] = absl::GetFlag(FLAGS_server_host);
+//     commandLineArguments["proxy_host"] = absl::GetFlag(FLAGS_proxy_host);
+//     commandLineArguments["token"] = absl::GetFlag(FLAGS_token);
+//     commandLineArguments["auth_scheme"] = absl::GetFlag(FLAGS_auth_scheme);
+//     commandLineArguments["insecure"] = absl::GetFlag(FLAGS_insecure);
+//     commandLineArguments["in"] = absl::GetFlag(FLAGS_in);
+// }

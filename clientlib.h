@@ -73,23 +73,32 @@ private:
     static const size_t chunkSize = 1024 * 1024; // 1 MB, change this to suit your needs
 };
 
-class CppClient {
+class FednClient {
 public:
-    CppClient(int argc, char** argv);
-    std::shared_ptr<ChannelInterface> setupGrpcChannel();
+    FednClient(std::string configFilePath);
+    std::map<std::string, std::string> getCombinerConfig();
+    std::shared_ptr<ChannelInterface> setupGrpcChannel(std::map<std::string, std::string> combinerConfig);
     void run(std::shared_ptr<GrpcClient> grpcClient);
     std::shared_ptr<ChannelInterface> getChannel();
+    std::shared_ptr<HttpClient> getHttpClient();
+    std::shared_ptr<GrpcClient> getGrpcClient();
+
+    void setAuthScheme(std::string authScheme);
+    void setHost(std::string host);
+    void setInsecure(bool insecure);
+    void setProxyHost(std::string proxyHost);
+    void setToken(std::string token);
 
 private:
     std::shared_ptr<GrpcClient> grpcClient;
-    std::unique_ptr<HttpClient> httpClient;
+    std::shared_ptr<HttpClient> httpClient;
     std::shared_ptr<ChannelInterface> channel;
-    json httpRequestData;
-    json commandLineArguments;
+    json controllerConfig;
+    std::map<std::string, std::string> combinerConfig;
+    // json commandLineArguments;
 
-    json assign();
-    void createChannel(json grpcChannelConfig);
-    void readCommandLineArguments(int argc, char** argv);
+    std::map<std::string, std::string> assign();
+    // void readCommandLineArguments(int argc, char** argv);
 };
 
 #endif // CLIENTLIB_H
