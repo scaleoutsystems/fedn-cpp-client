@@ -88,27 +88,6 @@ target_link_libraries(fedn_grpc_proto
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
 
-# # Define the source files for your project
-# set(SOURCES
-#     http_client.cpp
-# )
-
-# # Create an executable target
-# add_executable(http-client ${SOURCES})
-
-# # Link dependencies to the target
-# target_link_libraries(http-client PRIVATE CURL::libcurl yaml-cpp ${YAML_CPP_LIBRARIES} nlohmann_json::nlohmann_json)
-
-# add_executable(fedn-grpc "rpc.cpp")
-# # if ${ARMADILLO_LIBRARY} is set, link it
-# if(DEFINED ${ARMADILLO_LIBRARY})
-#   target_link_libraries(fedn-grpc fedn_grpc_proto absl::flags absl::flags_parse ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF} ${ARMADILLO_LIBRARY})
-# else()
-#   target_link_libraries(fedn-grpc fedn_grpc_proto absl::flags absl::flags_parse ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
-# endif()
-
-
-
 # # CLIENT LIBRARY fednlib
 
 # Add my_client as an executable
@@ -130,6 +109,10 @@ target_link_libraries(fednlib PRIVATE
   ${YAML_CPP_LIBRARIES} 
   nlohmann_json::nlohmann_json
 )
+
+if(DEFINED ${ARMADILLO_LIBRARY})
+  target_link_libraries(fednlib PRIVATE ${ARMADILLO_LIBRARY})
+endif()
 
 # Link the executable with libraries
 target_link_libraries(my_client

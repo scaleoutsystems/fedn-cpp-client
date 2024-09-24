@@ -198,37 +198,37 @@ std::string readToken(YAML::Node config) {
 }
 
 class MyCustomAuthenticator : public grpc::MetadataCredentialsPlugin {
- public:
-  MyCustomAuthenticator(const grpc::string& ticket) : ticket_(ticket) {}
+public:
+    MyCustomAuthenticator(const grpc::string& ticket) : ticket_(ticket) {}
 
-  grpc::Status GetMetadata(
-      grpc::string_ref service_url, grpc::string_ref method_name,
-      const grpc::AuthContext& channel_auth_context,
-      std::multimap<grpc::string, grpc::string>* metadata) override {
-    metadata->insert(std::make_pair("authorization", ticket_));
-    return grpc::Status::OK;
-  }
+    grpc::Status GetMetadata(
+        grpc::string_ref service_url, grpc::string_ref method_name,
+        const grpc::AuthContext& channel_auth_context,
+        std::multimap<grpc::string, grpc::string>* metadata) override {
+        metadata->insert(std::make_pair("authorization", ticket_));
+        return grpc::Status::OK;
+    }
 
- private:
-  grpc::string ticket_;
+private:
+    grpc::string ticket_;
 };
 
 class CustomMetadata : public grpc::MetadataCredentialsPlugin {
- public:
-  CustomMetadata(const grpc::string& key, const grpc::string& value)
-      : key_(key), value_(value) {}
+public:
+    CustomMetadata(const grpc::string& key, const grpc::string& value)
+        : key_(key), value_(value) {}
 
-  grpc::Status GetMetadata(
-      grpc::string_ref service_url, grpc::string_ref method_name,
-      const grpc::AuthContext& channel_auth_context,
-      std::multimap<grpc::string, grpc::string>* metadata) override {
-    metadata->insert(std::make_pair(key_, value_));
-    return grpc::Status::OK;
-  }
+    grpc::Status GetMetadata(
+        grpc::string_ref service_url, grpc::string_ref method_name,
+        const grpc::AuthContext& channel_auth_context,
+        std::multimap<grpc::string, grpc::string>* metadata) override {
+        metadata->insert(std::make_pair(key_, value_));
+        return grpc::Status::OK;
+    }
 
- private:
-  grpc::string key_;
-  grpc::string value_;
+private:
+    grpc::string key_;
+    grpc::string value_;
 };
 
 
@@ -316,6 +316,7 @@ void GrpcClient::ConnectModelUpdateStream() {
     reader->Finish();
     std::cout << "Disconnecting from TaskStream" << std::endl;
 }
+
 /**
 * Download global model from server.
 *
@@ -340,22 +341,22 @@ std::string GrpcClient::DownloadModel(const std::string& modelID) {
     // Read from stream
     ModelResponse modelResponse;
     while (reader->Read(&modelResponse)) {
-      std::cout << "ModelResponseID: " << modelResponse.id() << std::endl;
-      std::cout << "ModelResponseStatus: " << modelResponse.status() << std::endl;
-      if (modelResponse.status() == ModelStatus::IN_PROGRESS) {
-        const std::string& dataResponse = modelResponse.data();
-        accumulatedData += dataResponse;
-        std::cout << "Download in progress: " << modelResponse.id() << std::endl;
-        std::cout << "Downloaded size: " << accumulatedData.size() << " bytes" << std::endl;
-      } 
-      else if (modelResponse.status() == ModelStatus::OK) {
-        // Print download complete
-        std::cout << "Download complete for model: " << modelResponse.id() << std::endl;
-      }
-      else if (modelResponse.status() == ModelStatus::FAILED) {
-        // Print download failed
-        std::cout << "Download failed: internal server error" << std::endl;      
-      }
+        std::cout << "ModelResponseID: " << modelResponse.id() << std::endl;
+        std::cout << "ModelResponseStatus: " << modelResponse.status() << std::endl;
+        if (modelResponse.status() == ModelStatus::IN_PROGRESS) {
+            const std::string& dataResponse = modelResponse.data();
+            accumulatedData += dataResponse;
+            std::cout << "Download in progress: " << modelResponse.id() << std::endl;
+            std::cout << "Downloaded size: " << accumulatedData.size() << " bytes" << std::endl;
+        } 
+        else if (modelResponse.status() == ModelStatus::OK) {
+            // Print download complete
+            std::cout << "Download complete for model: " << modelResponse.id() << std::endl;
+        }
+        else if (modelResponse.status() == ModelStatus::FAILED) {
+            // Print download failed
+            std::cout << "Download failed: internal server error" << std::endl;      
+        }
     }
 
     reader->Finish();
@@ -367,12 +368,12 @@ std::string GrpcClient::DownloadModel(const std::string& modelID) {
 }
 
 /**
-* Upload local model to server in chunks.
-* 
-* @param modelID The model ID to upload.
-* @param modelData The model data to upload.
-* @param chunkSize The size of each chunk to upload.
-*/
+ * Upload local model to server in chunks.
+ * 
+ * @param modelID The model ID to upload.
+ * @param modelData The model data to upload.
+ * @param chunkSize The size of each chunk to upload.
+ */
 void GrpcClient::UploadModel(std::string& modelID, std::string& modelData) {
     // response 
     ModelResponse response;
@@ -438,12 +439,13 @@ void GrpcClient::UploadModel(std::string& modelID, std::string& modelData) {
         std::cout << "Response: " << response.message() << std::endl;
     }
 }
-//**
-// * Save model to file.
-// *
-// * @param modelData The model data to save.
-// * @param modelID The model ID to save. Will be used as filename.
-// * @param path The path to save the model to.
+/**
+ * Save model to file.
+ *
+ * @param modelData The model data to save.
+ * @param modelID The model ID to save. Will be used as filename.
+ * @param path The path to save the model to.
+ */
 void SaveModelToFile(const std::string& modelData, const std::string& modelPath) {
     // Write the binary string to a file
     // Create an ofstream object and open the file in binary mode
@@ -462,12 +464,14 @@ void SaveModelToFile(const std::string& modelData, const std::string& modelPath)
 
     std::cout << "modelData saved to file " << modelPath << " successfully" << std::endl;
 }
-//**
-// * Load model from file.
-// *
-// * @param modelID The model ID to load. Will be used as filename.
-// * @param path The path to load the model from.
-// * @return String containing binary data of the model.
+
+/**
+ * Load model from file.
+ *
+ * @param modelID The model ID to load. Will be used as filename.
+ * @param path The path to load the model from.
+ * @return String containing binary data of the model.
+ */
 std::string LoadModelFromFile(const std::string& modelPath) {
     // Create an ifstream object and open the file in binary mode
     std::ifstream inFile(modelPath, std::ios::binary);
@@ -488,12 +492,13 @@ std::string LoadModelFromFile(const std::string& modelPath) {
     // Return the data
     return data;
 }
-//
-//**
-// * Delete model from disk.
-// *
-// * @param modelID The model ID to delete.
-// * @param path The path to delete the model from.
+
+/**
+ * Delete model from disk.
+ *
+ * @param modelID The model ID to delete.
+ * @param path The path to delete the model from.
+ */
 void DeleteModelFromDisk(const std::string& modelPath) {
     // Delete the file
     if (remove((modelPath).c_str()) != 0) {
@@ -503,6 +508,7 @@ void DeleteModelFromDisk(const std::string& modelPath) {
         std::cout << "File deleted successfully: " << modelPath << std::endl;
     }
 }
+
 /**
  * This function loads a the current local model from a file, trains the model and saves the model update to file.
  * 
@@ -521,12 +527,13 @@ void GrpcClient::Train(const std::string& inModelPath, const std::string& outMod
     SaveModelToFile(modelUpdateData, outModelPath);
 }
 
-//**
-// * Update local model with global model as "seed" model.
-// * This is where ML code should be executed.
-// *
-// * @param modelID The model ID (Global) to update local model with.
-// * @param requestData The data field from ModelUpdate request, should contain the round config
+/**
+ * Update local model with global model as "seed" model.
+ * This is where ML code should be executed.
+ *
+ * @param modelID The model ID (Global) to update local model with.
+ * @param requestData The data field from ModelUpdate request, should contain the round config
+ */
 void GrpcClient::UpdateLocalModel(const std::string& modelID, const std::string& requestData) {
     std::cout << "Updating local model: " << modelID << std::endl;
 
@@ -560,12 +567,13 @@ void GrpcClient::UpdateLocalModel(const std::string& modelID, const std::string&
     DeleteModelFromDisk(std::string("./") + modelID + std::string(".bin"));
     DeleteModelFromDisk(std::string("./") + modelUpdateID + std::string(".bin"));
 }
-//**
-// * Send model update message to server.
-// *
-// * @param modelID The model ID (Global) to send model update for.
-// * @param modelUpdateID The model update ID (Local) to send model update for.
-// * @param config The round config
+/**
+ * Send model update message to server.
+ *
+ * @param modelID The model ID (Global) to send model update for.
+ * @param modelUpdateID The model update ID (Local) to send model update for.
+ * @param config The round config
+ */
 void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config) {
    // Send model update response to server
     Client client;
@@ -623,10 +631,10 @@ void GrpcClient::ValidateGlobalModel(const std::string& modelID, const std::stri
 }
 
 /**
-* Generate a random UUID version 4 string.
-*
-* @return A random UUID version 4 string.
-*/
+ * Generate a random UUID version 4 string.
+ *
+ * @return A random UUID version 4 string.
+ */
 std::string generateRandomUUID() {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -725,10 +733,6 @@ json readControllerConfig(YAML::Node config) {
 
 // Code - Client
 FednClient::FednClient(std::string configFilePath) {
-    // Parse command line arguments
-    // readCommandLineArguments(argc, argv);
-    // const std::string configFile = commandLineArguments["in"];
-
     // Read HTTP configuration from the "client.yaml" file
     YAML::Node config = YAML::LoadFile(configFilePath);
     controllerConfig = readControllerConfig(config);
@@ -742,12 +746,6 @@ FednClient::FednClient(std::string configFilePath) {
 
     // Create a Client instance with the API URL and token (if provided)
     httpClient = std::make_shared<HttpClient>(apiUrl, token);
-
-    // // Assign
-    // json combinerConfig = assign();
-
-    // // Create gRPC channel
-    // setupGrpcChannel(combinerConfig);
 }
 
 std::map<std::string, std::string> FednClient::getCombinerConfig() {
@@ -793,18 +791,14 @@ std::map<std::string, std::string> FednClient::assign() {
     std::cout << "Response: " << httpResponseData.dump(4) << std::endl;
 
     // Setup gRPC channel configuration
-    // combinerConfig["insecure"] = commandLineArguments["insecure"];
     combinerConfig["host"] = httpResponseData["host"];
     combinerConfig["proxy_host"] = httpResponseData["fqdn"];
     combinerConfig["token"] = httpClient->getToken();
-    // combinerConfig["auth_scheme"] = commandLineArguments["auth_scheme"];
-
 
     return combinerConfig;
 }
 
 std::shared_ptr<ChannelInterface> FednClient::setupGrpcChannel(std::map<std::string, std::string> combinerConfig) {
-    // TODO Egen funktion
     // Instantiate the client. It requires a channel, out of which the actual RPCs
     // are created. This channel models a connection to an server specified by
     // the argument "--target=".
@@ -900,15 +894,3 @@ void FednClient::setProxyHost(std::string proxyHost) {
 void FednClient::setToken(std::string token) {
     combinerConfig["token"] = token;
 }
-
-// void FednClient::readCommandLineArguments(int argc, char** argv) {
-//     absl::ParseCommandLine(argc, argv);
-//     commandLineArguments["name"] = absl::GetFlag(FLAGS_name);
-//     commandLineArguments["id"] = absl::GetFlag(FLAGS_id);
-//     commandLineArguments["server_host"] = absl::GetFlag(FLAGS_server_host);
-//     commandLineArguments["proxy_host"] = absl::GetFlag(FLAGS_proxy_host);
-//     commandLineArguments["token"] = absl::GetFlag(FLAGS_token);
-//     commandLineArguments["auth_scheme"] = absl::GetFlag(FLAGS_auth_scheme);
-//     commandLineArguments["insecure"] = absl::GetFlag(FLAGS_insecure);
-//     commandLineArguments["in"] = absl::GetFlag(FLAGS_in);
-// }
