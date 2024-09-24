@@ -109,16 +109,16 @@ target_link_libraries(fedn_grpc_proto
 
 
 
-# # CLIENT LIBRARY clientlib
+# # CLIENT LIBRARY fednlib
 
 # Add my_client as an executable
 add_executable(my_client "my_client.cpp")
 
-# # Add clientlib as a library
-add_library(clientlib STATIC "clientlib.cpp")
+# # Add fednlib as a library
+add_library(fednlib STATIC "fednlib.cpp")
 
-# # Link the clientlib with libraries
-target_link_libraries(clientlib PRIVATE 
+# # Link the fednlib with libraries
+target_link_libraries(fednlib PRIVATE 
   fedn_grpc_proto 
   absl::flags 
   absl::flags_parse 
@@ -133,7 +133,7 @@ target_link_libraries(clientlib PRIVATE
 
 # Link the executable with libraries
 target_link_libraries(my_client
-  clientlib
+  fednlib
   fedn_grpc_proto
   yaml-cpp
   nlohmann_json::nlohmann_json

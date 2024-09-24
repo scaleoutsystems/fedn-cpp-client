@@ -34,6 +34,11 @@ using fedn::ClientAvailableMessage;
 using fedn::WORKER;
 using fedn::Response;
 
+void SaveModelToFile(const std::string& modelData, const std::string& modelPath);
+std::string LoadModelFromFile(const std::string& modelPath);
+void DeleteModelFromDisk(const std::string& modelPath);
+std::string generateRandomUUID();
+
 class HttpClient {
 public:
     HttpClient(const std::string& apiUrl, const std::string& token);
@@ -53,24 +58,24 @@ public:
     void HeartBeat();
     void ConnectModelUpdateStream();
     std::string DownloadModel(const std::string& modelID);
-    void UploadModel(std::string& modelID, std::string& modelData, size_t chunkSize);
-    void SaveModelToFile(const std::string& modelData, const std::string& modelID, const std::string& path);
-    std::string LoadModelFromFile(const std::string& modelID, const std::string& path);
-    void DeleteModelFromDisk(const std::string& modelID, const std::string& path);
+    void UploadModel(std::string& modelID, std::string& modelData);
     virtual void UpdateLocalModel(const std::string& modelID, const std::string& requestData);
+    virtual void Train(const std::string& inModelPath, const std::string& outModelPath);
+    void ValidateGlobalModel(const std::string& modelID, const std::string& requestData);
+    virtual void Validate(const std::string& inModelPath, const std::string& outMetricPath);
     void SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config);
-    std::string generateRandomUUID();
     void SetName(const std::string& name);
     void SetId(const std::string& id);
+    void SetChunkSize(std::size_t chunkSize);
+    size_t GetChunkSize();
 
 private:
-    private:
     std::unique_ptr<Connector::Stub> connectorStub_;
     std::unique_ptr<Combiner::Stub> combinerStub_;
     std::unique_ptr<ModelService::Stub> modelserviceStub_;
     std::string name_;
     std::string id_;
-    static const size_t chunkSize = 1024 * 1024; // 1 MB, change this to suit your needs
+    std::size_t chunkSize; // 1 MB by default, change this to suit your needs
 };
 
 class FednClient {

@@ -1,6 +1,3 @@
-//  - Client
-
-// Imports - HttpClient
 #include <iostream>
 #include <string>
 #include <stdlib.h>
@@ -10,7 +7,6 @@
 
 using json = nlohmann::json;
 
-// Imports - GrpcClient
 #include <sstream>
 #include <memory>
 #include <vector>
@@ -28,8 +24,7 @@ using json = nlohmann::json;
 #include "fedn.grpc.pb.h"
 #include "fedn.pb.h"
 
-// Imports - FednClient
-#include "clientlib.h"
+#include "fednlib.h"
 
 // Include Armadillo for matrix operations
 // #include <mlpack.hpp>
@@ -64,8 +59,16 @@ using fedn::ClientAvailableMessage;
 using fedn::WORKER;
 using fedn::Response;
 
-// Code - HttpClient
-// Callback function to write HTTP response data into a string
+/**
+ * Callback for handling data received from a network request.
+ * It appends the received HTTP response data to the provided output string.
+ * 
+ * @param contents Pointer to the data received.
+ * @param size Size of each data element.
+ * @param nmemb Number of data elements.
+ * @param output Pointer to the string where the received data will be appended.
+ * @return The total size of the data processed (size * nmemb).
+ */
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
     size_t totalSize = size * nmemb;
     output->append(static_cast<char*>(contents), totalSize);
@@ -194,7 +197,6 @@ std::string readToken(YAML::Node config) {
     return token;
 }
 
-// Code - GrpcClient
 class MyCustomAuthenticator : public grpc::MetadataCredentialsPlugin {
  public:
   MyCustomAuthenticator(const grpc::string& ticket) : ticket_(ticket) {}
@@ -233,10 +235,12 @@ class CustomMetadata : public grpc::MetadataCredentialsPlugin {
 GrpcClient::GrpcClient(std::shared_ptr<ChannelInterface> channel)
       : connectorStub_(Connector::NewStub(channel)),
         combinerStub_(Combiner::NewStub(channel)),
-        modelserviceStub_(ModelService::NewStub(channel)) {}
+        modelserviceStub_(ModelService::NewStub(channel)) {
+            this->SetChunkSize(1024 * 1024);
+        }
 
-  // Assembles the client's payload, sends it and presents the response back
-  // from the server.
+// Assembles the client's payload, sends it and presents the response back
+// from the server.
 void GrpcClient::HeartBeat() {
     // Data we are sending to the server.
     Client* client = new Client();
@@ -268,10 +272,9 @@ void GrpcClient::HeartBeat() {
     if (!status.ok()) {
       // Print response attribute from fedn::Response
       std::cout << "HeartbeatResponse: " << reply.response() << std::endl;
-      std::cout << status.error_code() << ": " << status.error_message()
-                << std::endl;
+      std::cout << status.error_code() << ": " << status.error_message() << std::endl;
     }
-  }
+}
 
 void GrpcClient::ConnectModelUpdateStream() {
     // Data we are sending to the server.
@@ -312,12 +315,12 @@ void GrpcClient::ConnectModelUpdateStream() {
     }
     reader->Finish();
     std::cout << "Disconnecting from TaskStream" << std::endl;
-  }
-  /**
-  * Download global model from server.
-  *
-  * @return A vector of char containing the model data.
-  */
+}
+/**
+* Download global model from server.
+*
+* @return A vector of char containing the model data.
+*/
 std::string GrpcClient::DownloadModel(const std::string& modelID) {
 
     // request 
@@ -344,108 +347,107 @@ std::string GrpcClient::DownloadModel(const std::string& modelID) {
         accumulatedData += dataResponse;
         std::cout << "Download in progress: " << modelResponse.id() << std::endl;
         std::cout << "Downloaded size: " << accumulatedData.size() << " bytes" << std::endl;
-
-      } else if (modelResponse.status() == ModelStatus::OK) {
+      } 
+      else if (modelResponse.status() == ModelStatus::OK) {
         // Print download complete
         std::cout << "Download complete for model: " << modelResponse.id() << std::endl;
-      
       }
       else if (modelResponse.status() == ModelStatus::FAILED) {
         // Print download failed
-        std::cout << "Download failed: internal server error" << std::endl;
-      
+        std::cout << "Download failed: internal server error" << std::endl;      
       }
-
     }
+
     reader->Finish();
     std::cout << "Downloaded size: " << accumulatedData.size() << " bytes" << std::endl;
     std::cout << "Disconnecting from DownloadStream" << std::endl;
     
     // return accumulatedData
     return accumulatedData;
+}
+
+/**
+* Upload local model to server in chunks.
+* 
+* @param modelID The model ID to upload.
+* @param modelData The model data to upload.
+* @param chunkSize The size of each chunk to upload.
+*/
+void GrpcClient::UploadModel(std::string& modelID, std::string& modelData) {
+    // response 
+    ModelResponse response;
+    // context
+    ClientContext context;
+
+    // Client
+    Client* client = new Client();
+    client->set_name(name_);
+    client->set_role(WORKER);
+    client->set_client_id(id_);
+
+    // Get ClientWriter from stream
+    std::unique_ptr<ClientWriter<ModelRequest> > writer(
+        modelserviceStub_->Upload(&context, &response));
+
+    // Calculate the number of chunks
+    size_t chunkSize = this->GetChunkSize();
+    size_t totalSize = modelData.size();
+    size_t offset = 0;
+
+    std::cout << "Upload in progress: " << modelID << std::endl;
+    std::cout << "Chunk size: " << chunkSize << " bytes" << std::endl;
+
+    while (offset < totalSize) {
+        ModelRequest request;
+        size_t currentChunkSize = std::min(chunkSize, totalSize - offset);
+        request.set_data(modelData.data() + offset, currentChunkSize);
+        request.set_id(modelID);
+        request.set_status(ModelStatus::IN_PROGRESS);
+        // Pass ownership of client to protobuf message only for the first chunk
+        if (offset == 0) {
+            request.set_allocated_sender(client);
+        }
+
+        if (!writer->Write(request)) {
+            // Broken stream.
+            std::cout << "Upload failed for model: " << modelID << std::endl;
+            std::cout << "Disconnecting from UploadStream" << std::endl;
+            grpc::Status status = writer->Finish();
+            return;
+        }
+        std::cout << "Uploading chunk: " << offset << " - " << offset + currentChunkSize << std::endl;
+        offset += currentChunkSize;
     }
 
-  /**
-   * Upload local model to server in chunks.
-   * 
-   * @param modelID The model ID to upload.
-   * @param modelData The model data to upload.
-   * @param chunkSize The size of each chunk to upload.
-   */
-void GrpcClient::UploadModel(std::string& modelID, std::string& modelData, size_t chunkSize) {
-      // response 
-      ModelResponse response;
-      // context
-      ClientContext context;
+    // Finish writing to stream with final message
+    ModelRequest requestFinal;
+    requestFinal.set_id(modelID);
+    requestFinal.set_status(ModelStatus::OK);
+    writer->Write(requestFinal);
+    writer->WritesDone();
+    grpc::Status status = writer->Finish();
 
-      // Client
-      Client* client = new Client();
-      client->set_name(name_);
-      client->set_role(WORKER);
-      client->set_client_id(id_);
-
-      // Get ClientWriter from stream
-      std::unique_ptr<ClientWriter<ModelRequest> > writer(
-          modelserviceStub_->Upload(&context, &response));
-
-      // Calculate the number of chunks
-      size_t totalSize = modelData.size();
-      size_t offset = 0;
-
-      std::cout << "Upload in progress: " << modelID << std::endl;
-
-      while (offset < totalSize) {
-          ModelRequest request;
-          size_t currentChunkSize = std::min(chunkSize, totalSize - offset);
-          request.set_data(modelData.data() + offset, currentChunkSize);
-          request.set_id(modelID);
-          request.set_status(ModelStatus::IN_PROGRESS);
-          // Pass ownership of client to protobuf message only for the first chunk
-          if (offset == 0) {
-              request.set_allocated_sender(client);
-          }
-
-          if (!writer->Write(request)) {
-              // Broken stream.
-              std::cout << "Upload failed for model: " << modelID << std::endl;
-              std::cout << "Disconnecting from UploadStream" << std::endl;
-              grpc::Status status = writer->Finish();
-              return;
-          }
-          std::cout << "Uploading chunk: " << offset << " - " << offset + currentChunkSize << std::endl;
-          offset += currentChunkSize;
-      }
-
-      // Finish writing to stream with final message
-      ModelRequest requestFinal;
-      requestFinal.set_id(modelID);
-      requestFinal.set_status(ModelStatus::OK);
-      writer->Write(requestFinal);
-      writer->WritesDone();
-      grpc::Status status = writer->Finish();
-
-      if (status.ok()) {
+    if (status.ok()) {
         std::cout << "Upload complete for local model: " << modelID << std::endl;
         // Print message from response
         std::cout << "Response: " << response.message() << std::endl;
-      } else {
+    } else {
         std::cout << "Upload failed for model: " << modelID << std::endl;
-        std::cout << status.error_code() << ": " << status.error_message()
-                  << std::endl;
+        std::cout << status.error_code() << ": " << status.error_message() << std::endl;
         // Print message from response
         std::cout << "Response: " << response.message() << std::endl;
-      }
-  }
-  //**
-  // * Save model to file.
-  // *
-  // * @param modelData The model data to save.
-  // * @param modelID The model ID to save. Will be used as filename.
-  // * @param path The path to save the model to.
-void GrpcClient::SaveModelToFile(const std::string& modelData, const std::string& modelID, const std::string& path) {
+    }
+}
+//**
+// * Save model to file.
+// *
+// * @param modelData The model data to save.
+// * @param modelID The model ID to save. Will be used as filename.
+// * @param path The path to save the model to.
+void SaveModelToFile(const std::string& modelData, const std::string& modelPath) {
     // Write the binary string to a file
     // Create an ofstream object and open the file in binary mode
-    std::ofstream outFile(path + modelID + ".bin", std::ios::binary);
+    std::ofstream outFile(modelPath, std::ios::binary);
 
     // Check if the file was opened successfully
     if (!outFile) {
@@ -458,20 +460,20 @@ void GrpcClient::SaveModelToFile(const std::string& modelData, const std::string
     // Close the file
     outFile.close();
 
-    std::cout << "modelData saved to file successfully" << std::endl;
-  }
-  //**
-  // * Load model from file.
-  // *
-  // * @param modelID The model ID to load. Will be used as filename.
-  // * @param path The path to load the model from.
-  // * @return String containing binary data of the model.
-std::string GrpcClient::LoadModelFromFile(const std::string& modelID, const std::string& path) {
+    std::cout << "modelData saved to file " << modelPath << " successfully" << std::endl;
+}
+//**
+// * Load model from file.
+// *
+// * @param modelID The model ID to load. Will be used as filename.
+// * @param path The path to load the model from.
+// * @return String containing binary data of the model.
+std::string LoadModelFromFile(const std::string& modelPath) {
     // Create an ifstream object and open the file in binary mode
-    std::ifstream inFile(path + modelID + ".bin", std::ios::binary);
+    std::ifstream inFile(modelPath, std::ios::binary);
     // Check if the file was opened successfully
     if (!inFile) {
-        std::cerr << "Error opening file for reading" << std::endl;
+        std::cerr << "Error opening file " << modelPath << " for reading" << std::endl;
     }
     // Get the length of the file
     inFile.seekg(0, inFile.end);
@@ -485,72 +487,85 @@ std::string GrpcClient::LoadModelFromFile(const std::string& modelID, const std:
     inFile.close();
     // Return the data
     return data;
-  }
-  //
-  //**
-  // * Delete model from disk.
-  // *
-  // * @param modelID The model ID to delete.
-  // * @param path The path to delete the model from.
-void GrpcClient::DeleteModelFromDisk(const std::string& modelID, const std::string& path) {
+}
+//
+//**
+// * Delete model from disk.
+// *
+// * @param modelID The model ID to delete.
+// * @param path The path to delete the model from.
+void DeleteModelFromDisk(const std::string& modelPath) {
     // Delete the file
-    if (remove((path + modelID + ".bin").c_str()) != 0) {
+    if (remove((modelPath).c_str()) != 0) {
         std::cerr << "Error deleting file" << std::endl;
     }
     else {
-        std::cout << "File deleted successfully: " << modelID << std::endl;
+        std::cout << "File deleted successfully: " << modelPath << std::endl;
     }
-  }
-  //**
-  // * Update local model with global model as "seed" model.
-  // * This is where ML code should be executed.
-  // *
-  // * @param modelID The model ID (Global) to update local model with.
-  // * @param requestData The data field from ModelUpdate request, should contain the round config
+}
+/**
+ * This function loads a the current local model from a file, trains the model and saves the model update to file.
+ * 
+ * @param modelID The ID of the global model to be used as a seed.
+ * @param modelUpdateID The ID for the updated local model.
+ * @param path The path where the model files are located.
+ */
+void GrpcClient::Train(const std::string& inModelPath, const std::string& outModelPath) {
+    // Using own code to load the matrix from a binary file, dymmy code. Remove if using Armadillo
+    std::string modelData = LoadModelFromFile(inModelPath);
+    
+    // Send the same model back as update
+    std::string modelUpdateData = modelData;
+    
+    // Using own code to save the matrix as a binary file, dymmy code. Remove if using Armadillo
+    SaveModelToFile(modelUpdateData, outModelPath);
+}
+
+//**
+// * Update local model with global model as "seed" model.
+// * This is where ML code should be executed.
+// *
+// * @param modelID The model ID (Global) to update local model with.
+// * @param requestData The data field from ModelUpdate request, should contain the round config
 void GrpcClient::UpdateLocalModel(const std::string& modelID, const std::string& requestData) {
     std::cout << "Updating local model: " << modelID << std::endl;
+
     // Download model from server
     std::cout << "Downloading model: " << modelID << std::endl;
     std::string modelData = GrpcClient::DownloadModel(modelID);
+
     // Save model to file
     // TODO: model should be saved to a temporary file and chunks should be written to it
     std::cout << "Saving model to file: " << modelID << std::endl;
-    GrpcClient::SaveModelToFile(modelData, modelID, "./");
-    // Dummy code: update model with modelData
-    std::cout << "Dummy code: Updating local model with global model as seed!" << std::endl;
-    // Example of loading a matrix from a binary file using Armadillo
-    // arma::mat loadedData;
-    // loadedData.load("./" + modelID + ".bin", arma::raw_binary);
-    // std::cout << "Loaded data: " << loadedData << std::endl;
-    // Update the matrix (model)
-    // loadedData += 1;
+    SaveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
+
     // Create random UUID4 for model update
-    std::cout << "Generating random UUID for model update" << std::endl;
-    std::string modelUpdateID = GrpcClient::generateRandomUUID();
-    // Save the matrix as raw binary file
-    // Using Armadillo to save the matrix as a binary file
-    // loadedData.save("./" + modelUpdateID + ".bin", arma::raw_binary);
-    // Using own code to save the matrix as a binary file, dymmy code. Remove if using Armadillo
-    GrpcClient::SaveModelToFile(modelData, modelUpdateID, "./");
+    std::string modelUpdateID = generateRandomUUID();
+    std::cout << "Generated random UUID " << modelUpdateID << " for model update" << std::endl;
+
+    // Train the model
+    this->Train(std::string("./") + modelID + std::string(".bin"), std::string("./") + modelUpdateID + std::string(".bin"));
+
     // Read the binary string from the file
-    // Load model from file
     std::cout << "Loading model from file: " << modelUpdateID << std::endl;
-    std::string data = GrpcClient::LoadModelFromFile(modelUpdateID, "./");
+    std::string data = LoadModelFromFile(std::string("./") + modelUpdateID + std::string(".bin"));
 
     // Upload model to server
-    GrpcClient::UploadModel(modelUpdateID, data, GrpcClient::chunkSize);
+    GrpcClient::UploadModel(modelUpdateID, data);
+
     // Send model update response to server
     GrpcClient::SendModelUpdate(modelID, modelUpdateID, requestData);
+
     // Delete model from disk
-    GrpcClient::DeleteModelFromDisk(modelID, "./");
-    GrpcClient::DeleteModelFromDisk(modelUpdateID, "./");
-  }
-  //**
-  // * Send model update message to server.
-  // *
-  // * @param modelID The model ID (Global) to send model update for.
-  // * @param modelUpdateID The model update ID (Local) to send model update for.
-  // * @param config The round config
+    DeleteModelFromDisk(std::string("./") + modelID + std::string(".bin"));
+    DeleteModelFromDisk(std::string("./") + modelUpdateID + std::string(".bin"));
+}
+//**
+// * Send model update message to server.
+// *
+// * @param modelID The model ID (Global) to send model update for.
+// * @param modelUpdateID The model update ID (Local) to send model update for.
+// * @param config The round config
 void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config) {
    // Send model update response to server
     Client client;
@@ -596,13 +611,23 @@ void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelU
     std::cout << "SendModelUpdate: Response: " << response.response() << std::endl;
     // Garbage collect the client object.
     Client *clientCollect = modelUpdate.release_sender();
-  }
-  /**
-   * Generate a random UUID version 4 string.
-   *
-   * @return A random UUID version 4 string.
-   */
-std::string GrpcClient::generateRandomUUID() {
+}
+void GrpcClient::Validate(const std::string& inModelPath, const std::string& outMetricPath) {
+    // Placeholder for model validation logic
+}
+
+void GrpcClient::ValidateGlobalModel(const std::string& modelID, const std::string& requestData) {
+    // Placeholder for model validation
+    const std::string metricPath = std::string("./validation/") + modelID + std::string(".csv");
+    this->Validate(std::string("./") + modelID + std::string(".bin"), metricPath);
+}
+
+/**
+* Generate a random UUID version 4 string.
+*
+* @return A random UUID version 4 string.
+*/
+std::string generateRandomUUID() {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, 15);
@@ -625,6 +650,14 @@ void GrpcClient::SetName(const std::string& name) {
 
 void GrpcClient::SetId(const std::string& id) {
     id_ = id;
+}
+
+void GrpcClient::SetChunkSize(std::size_t chunkSize) {
+    this->chunkSize = chunkSize;
+}
+
+std::size_t GrpcClient::GetChunkSize() {
+    return chunkSize;
 }
 
 void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
