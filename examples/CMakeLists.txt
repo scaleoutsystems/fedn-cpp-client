@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
-project(hw-cpp VERSION 1.0 DESCRIPTION "hw client in C++")
+project(hw-cpp-example VERSION 1.0 DESCRIPTION "Example FEDn client in C++")
+
 
 # Find required dependencies for HTTP client
 find_package(CURL REQUIRED)
@@ -51,7 +52,7 @@ endif()
 #set(ARMADILLO_INCLUDE_DIRS "/usr/include")
 
 # Proto file for project
-get_filename_component(fedn_proto "src/protos/fedn.proto" ABSOLUTE)
+get_filename_component(fedn_proto "../src/protos/fedn.proto" ABSOLUTE)
 get_filename_component(fedn_proto_path "${fedn_proto}" PATH)
 
 # Generated sources
@@ -88,26 +89,29 @@ target_link_libraries(fedn_grpc_proto
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
 
-# # Add fednlib as a library
-add_library(fednlib STATIC "src/fednlib.cpp")
+# Manually specify the path where fednlib was built (adjust path if necessary)
+set(FEDNLIB_DIR "${CMAKE_SOURCE_DIR}/../cmake/build")  # Adjust this path to point to where libfednlib.a is built
 
-# # Link the fednlib with libraries
-target_link_libraries(fednlib PRIVATE 
-fedn_grpc_proto 
-absl::flags 
-absl::flags_parse 
-${_REFLECTION} 
-${_GRPC_GRPCPP} 
-${_PROTOBUF_LIBPROTOBUF} 
-CURL::libcurl 
-yaml-cpp 
-${YAML_CPP_LIBRARIES} 
-nlohmann_json::nlohmann_json
+# Include fednlib's include directory for fednlib.h and other headers
+include_directories(${CMAKE_SOURCE_DIR}/../include)  # Point to the headers in the parent include directory
+
+# Specify the directory where the built fednlib library is located
+link_directories(${FEDNLIB_DIR})  # Add the directory where libfednlib.a resides
+
+# Add my_client as an executable
+add_executable(my_client "my_client.cpp")
+
+# Link the executable with libraries
+target_link_libraries(my_client
+  fednlib
+  fedn_grpc_proto
+  yaml-cpp
+  nlohmann_json::nlohmann_json
+  ${CURL_LIBRARIES}
+  ${_REFLECTION}
+  ${_GRPC_GRPCPP}
+  ${_PROTOBUF_LIBPROTOBUF}
 )
 
-if(DEFINED ${ARMADILLO_LIBRARY})
-target_link_libraries(fednlib PRIVATE ${ARMADILLO_LIBRARY})
-endif()
-
-# Include directories
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+# Set the include directories for the example
+include_directories(${CMAKE_SOURCE_DIR}/include)

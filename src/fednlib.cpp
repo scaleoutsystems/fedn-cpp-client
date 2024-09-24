@@ -24,7 +24,7 @@ using json = nlohmann::json;
 #include "fedn.grpc.pb.h"
 #include "fedn.pb.h"
 
-#include "fednlib.h"
+#include "../include/fednlib.h"
 
 // Include Armadillo for matrix operations
 // #include <mlpack.hpp>
