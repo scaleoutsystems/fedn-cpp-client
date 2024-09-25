@@ -90,7 +90,7 @@ target_link_libraries(fedn_grpc_proto
   ${_PROTOBUF_LIBPROTOBUF})
 
 # Manually specify the path where fednlib was built (adjust path if necessary)
-set(FEDNLIB_DIR "${CMAKE_SOURCE_DIR}/../cmake/build")  # Adjust this path to point to where libfednlib.a is built
+set(FEDNLIB_DIR "${CMAKE_SOURCE_DIR}/../build")  # Adjust this path to point to where libfednlib.a is built
 
 # Include fednlib's include directory for fednlib.h and other headers
 include_directories(${CMAKE_SOURCE_DIR}/../include)  # Point to the headers in the parent include directory

@@ -26,17 +26,27 @@ public:
         
         // Send the same model back as update
         std::string modelUpdateData = modelData;
-        std::cout << "Training model..." << std::endl;
-        std::cout << "In model: " << inModelPath << std::endl;
-        std::cout << "Out model: " << outModelPath << std::endl;
+        std::cout << "USER-DEFINED CODE: Training model..." << std::endl;
         
         // Using own code to save the matrix as a binary file, dymmy code. Remove if using Armadillo
         SaveModelToFile(modelUpdateData, outModelPath);
     }
+    void Validate(const std::string& inModelPath, const std::string& outMetricPath) override {
+
+        std::string modelData = LoadModelFromFile(inModelPath);
+        std::cout << "USER-DEFINED CODE: Validating model..." << std::endl;
+
+        // Dummy code: validate model
+        json metrics = {
+            "accuracy", "0.95",
+            "loss", "0.05"
+        };
+        SaveMetricsToFile(metrics, outMetricPath);
+    }
 };
 
 int main(int argc, char** argv) {
-    FednClient client("../../../client.yaml");
+    FednClient client("../../client.yaml");
 
     std::map<std::string, std::string> combinerConfig = client.getCombinerConfig();
 

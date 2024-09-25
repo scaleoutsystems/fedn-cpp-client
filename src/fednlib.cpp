@@ -20,6 +20,7 @@ using json = nlohmann::json;
 #include "absl/flags/parse.h"
 
 #include <grpcpp/grpcpp.h>
+#include "google/protobuf/timestamp.pb.h"
 
 #include "fedn.grpc.pb.h"
 #include "fedn.pb.h"
@@ -49,6 +50,7 @@ using fedn::Combiner;
 using fedn::ModelService;
 using fedn::Heartbeat;
 using fedn::ModelUpdate;
+using fedn::ModelValidation;
 using fedn::TaskRequest;
 using fedn::ModelResponse;
 using fedn::ModelRequest;
@@ -276,7 +278,7 @@ void GrpcClient::HeartBeat() {
     }
 }
 
-void GrpcClient::ConnectModelUpdateStream() {
+void GrpcClient::ConnectTaskStream() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
@@ -296,18 +298,19 @@ void GrpcClient::ConnectModelUpdateStream() {
         combinerStub_->TaskStream(&context, request));
 
     // Read from stream
-    TaskRequest modelUpdate;
-    while (reader->Read(&modelUpdate)) {
-      std::cout << "TaskRequest ModelID: " << modelUpdate.model_id() << std::endl;
-      std::cout << "TaskRequest: TaskType:" << modelUpdate.type() << std::endl;
-      if (modelUpdate.type() == StatusType::MODEL_UPDATE) {
-        this->UpdateLocalModel(modelUpdate.model_id(), modelUpdate.data());
+    // TODO: Generalize this to handle different types of TaskRequests, i.e don't call TaskRequest "modelUpdate"
+    TaskRequest task;
+    while (reader->Read(&task)) {
+      std::cout << "TaskRequest ModelID: " << task.model_id() << std::endl;
+      std::cout << "TaskRequest: TaskType:" << task.type() << std::endl;
+      if (task.type() == StatusType::MODEL_UPDATE) {
+        this->UpdateLocalModel(task.model_id(), task.data());
       }
-      else if (modelUpdate.type() == StatusType::MODEL_VALIDATION) {
+      else if (task.type() == StatusType::MODEL_VALIDATION) {
         // TODO: Implement model validation
-        std::cout << "Model validation not implemented, skipping..." << std::endl;
+        this->ValidateGlobalModel(task.model_id(), task);
       }
-      else if (modelUpdate.type() == StatusType::INFERENCE) {
+      else if (task.type() == StatusType::INFERENCE) {
         // TODO: Implement model inference
         std::cout << "Model inference not implemented, skipping..." << std::endl;
       }
@@ -492,23 +495,68 @@ std::string LoadModelFromFile(const std::string& modelPath) {
     // Return the data
     return data;
 }
+/**
+ * Load metrics from file.
+ * 
+ * @param metricPath The path to load the metrics from.
+ * @return JSON object containing the metrics.
+ */
+json LoadMetricsFromFile(const std::string& metricPath) {
+    // Create an ifstream object and open the file as json
+    std::ifstream inFile(metricPath);
+    // Check if the file was opened successfully
+    if (!inFile) {
+        std::cerr << "Error opening file " << metricPath << " for reading" << std::endl;
+    }
+    // Create a json object to hold the data
+    json metrics;
+    try {
+        metrics = json::parse(inFile);
+    } catch (const nlohmann::detail::type_error e) {
+        inFile.close();
+        std::cerr << "Error parsing metrics JSON: " << e.what() << std::endl;
+    }
+    // Close the file
+    inFile.close();
+    // Return the data
+    std::cout << "Metrics loaded from file " << metricPath << " successfully" << std::endl;
+    return metrics;
+}
 
 /**
- * Delete model from disk.
+ * Save metrics to file.
+ * 
+ * @param metrics The metrics to save, as a JSON object.
+ * @param metricPath The path to save the metrics to.
+ */
+void SaveMetricsToFile(const json& metrics, const std::string& metricPath) {
+    // Create an ofstream object and open the file in binary mode
+    std::ofstream outFile(metricPath);
+    // Check if the file was opened successfully
+    if (!outFile) {
+        std::cerr << "Error opening file for writing" << std::endl;
+    }
+    // Write the json to the file
+    outFile << metrics.dump(4);
+    // Close the file
+    outFile.close();
+    std::cout << "Metrics saved to file " << metricPath << " successfully" << std::endl;
+}
+
+/**
+ * Delete file from disk.
  *
- * @param modelID The model ID to delete.
  * @param path The path to delete the model from.
  */
-void DeleteModelFromDisk(const std::string& modelPath) {
+void DeleteFileFromDisk(const std::string& path) {
     // Delete the file
-    if (remove((modelPath).c_str()) != 0) {
+    if (remove((path).c_str()) != 0) {
         std::cerr << "Error deleting file" << std::endl;
     }
     else {
-        std::cout << "File deleted successfully: " << modelPath << std::endl;
+        std::cout << "File deleted successfully: " << path << std::endl;
     }
 }
-
 /**
  * This function loads a the current local model from a file, trains the model and saves the model update to file.
  * 
@@ -564,8 +612,8 @@ void GrpcClient::UpdateLocalModel(const std::string& modelID, const std::string&
     GrpcClient::SendModelUpdate(modelID, modelUpdateID, requestData);
 
     // Delete model from disk
-    DeleteModelFromDisk(std::string("./") + modelID + std::string(".bin"));
-    DeleteModelFromDisk(std::string("./") + modelUpdateID + std::string(".bin"));
+    DeleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
+    DeleteFileFromDisk(std::string("./") + modelUpdateID + std::string(".bin"));
 }
 /**
  * Send model update message to server.
@@ -596,7 +644,7 @@ void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelU
     std::string timeString = ss.str();
     modelUpdate.set_timestamp(timeString);
 
-    // TODO: get metadata from local model
+    // TODO: get metadata from Train function
     // string as json
     std::ostringstream oss;
     std::string metadata = "{\"training_metadata\": {\"epochs\": 1, \"batch_size\": 1, \"num_examples\": 3000}}";
@@ -615,19 +663,92 @@ void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelU
                 << std::endl;
       std::cout << "SendModelUpdate: Response: " << response.response() << std::endl;
     }
-    // Print response attribute from fedn::Response
-    std::cout << "SendModelUpdate: Response: " << response.response() << std::endl;
+    else {
+      std::cout << "SendModelUpdate: Response: " << response.response() << std::endl;
+    }
     // Garbage collect the client object.
     Client *clientCollect = modelUpdate.release_sender();
 }
-void GrpcClient::Validate(const std::string& inModelPath, const std::string& outMetricPath) {
-    // Placeholder for model validation logic
+void GrpcClient::SendModelValidation(const std::string& modelID, const std::string& metricData, TaskRequest& requestData) {
+    // Send model validation response to server
+    Client client;
+    client.set_name(name_);
+    client.set_role(WORKER);
+    client.set_client_id(id_);
+
+    ModelValidation validation;
+    validation.set_allocated_sender(&client);
+    validation.set_model_id(modelID);
+    validation.set_data(metricData);
+    validation.set_session_id(requestData.session_id());
+
+    // TODO: get metadata from Train function
+    // string as json
+    std::ostringstream oss;
+    std::string metadata = "{\"validation_metadata\": {\"num_examples\": 3000}}";
+    validation.set_meta(metadata);
+    
+    // get current date and time
+    google::protobuf::Timestamp* timestamp = validation.mutable_timestamp();
+    // Get the current time
+    auto now = std::chrono::system_clock::now();
+    // Convert to time_t
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    // Convert to Timestamp
+    timestamp->set_seconds(now_c);
+    timestamp->set_nanos(0);
+
+    // The actual RPC.
+    ClientContext context;
+    Response response;
+    Status status = combinerStub_->SendModelValidation(&context, validation, &response);
+    std::cout << "SendModelValidation: " << validation.model_id() << std::endl;
+
+    if (!status.ok()) {
+      std::cout << "SendModelValidation: failed for model: " << modelID << std::endl;
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "SendModelValidation: Response: " << response.response() << std::endl;
+    }
+    else {
+      std::cout << "SendModelValidation: Response: " << response.response() << std::endl;
+    }
+    // Garbage collect the client object.
+    Client *clientCollect = validation.release_sender();
 }
 
-void GrpcClient::ValidateGlobalModel(const std::string& modelID, const std::string& requestData) {
-    // Placeholder for model validation
-    const std::string metricPath = std::string("./validation/") + modelID + std::string(".csv");
+
+void GrpcClient::Validate(const std::string& inModelPath, const std::string& outMetricPath) {
+    // Placeholder for model validation logic
+    std::cout << "Validating model: " << inModelPath << std::endl;
+}
+
+void GrpcClient::ValidateGlobalModel(const std::string& modelID, TaskRequest& requestData) {
+    std::cout << "Validating global model: " << modelID << std::endl;
+
+    // Download model from server
+    std::cout << "Downloading model: " << modelID << std::endl;
+    std::string modelData = GrpcClient::DownloadModel(modelID);
+
+    // Save model to file
+    // TODO: model should be saved to a temporary file and chunks should be written to it
+    std::cout << "Saving model to file: " << modelID << std::endl;
+    SaveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
+
+    const std::string metricPath = std::string("./") + modelID + std::string(".json");
+
+    // Validate the model
     this->Validate(std::string("./") + modelID + std::string(".bin"), metricPath);
+
+    // Read the metric file from disk
+    std::cout << "Loading metric from file: " << metricPath << std::endl;
+    json metricData = LoadMetricsFromFile(metricPath);
+
+    // Send model validation response to server
+    GrpcClient::SendModelValidation(modelID, metricData.dump(), requestData);
+
+    // Delete metrics file from disk
+    DeleteFileFromDisk(metricPath);
 }
 
 /**
@@ -710,7 +831,11 @@ json readControllerConfig(YAML::Node config) {
     json controllerConfig;
     controllerConfig["client_id"] = config["client_id"].as<std::string>();
     controllerConfig["name"] = config["name"].as<std::string>();
-    controllerConfig["package"] = "remote";
+    if (config["package"]) {
+        controllerConfig["package"] = config["package"].as<std::string>();
+    } else {
+        controllerConfig["package"] = "remote";
+    }
 
     // Check if the client_id is valid
     if (!controllerConfig["client_id"].is_string()) {
@@ -749,18 +874,22 @@ FednClient::FednClient(std::string configFilePath) {
 }
 
 std::map<std::string, std::string> FednClient::getCombinerConfig() {
+    #ifdef DEBUG
     std::cout << "DEBUG Combiner configuration PRE-ASSIGNMENT:" << std::endl;
     for (auto const& x : combinerConfig) {
         std::cout << "  " << x.first << ": " << x.second << std::endl;
     }
+    #endif
     
-    if (combinerConfig.count("host") == 0 || combinerConfig.count("proxy_host") == 0) {
+    if (combinerConfig["host"].empty()) {
         // Assign to combiner
         combinerConfig = assign();
+        #ifdef DEBUG
         std::cout << "DEBUG Combiner configuration POST-ASSIGNMENT:" << std::endl;
         for (auto const& x : combinerConfig) {
             std::cout << "  " << x.first << ": " << x.second << std::endl;
         }
+        #endif
     }
     return combinerConfig;
 }
@@ -779,7 +908,7 @@ void FednClient::run(std::shared_ptr<GrpcClient> customGrpcClient) {
 
     // Start heart beat thread and listen to model update requests
     std::thread HeartBeatThread(SendIntervalHeartBeat, grpcClient.get(), 10);
-    grpcClient->ConnectModelUpdateStream();
+    grpcClient->ConnectTaskStream();
     HeartBeatThread.join();
 }
 
