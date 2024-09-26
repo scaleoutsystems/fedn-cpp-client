@@ -55,13 +55,19 @@ void SaveModelToFile(const std::string& modelData, const std::string& modelPath)
  */
 void SaveMetricsToFile(const json& metrics, const std::string& metricPath) {
     // Create an ofstream object and open the file in binary mode
+    // Ensure that metrics is a json object and not an array
+    if (!metrics.is_object()) {
+        std::cerr << "WARNING: Metrics must be a JSON object, arrays are not allowed." << std::endl;
+    }
+
+
     std::ofstream outFile(metricPath);
     // Check if the file was opened successfully
     if (!outFile) {
         std::cerr << "Error opening file for writing" << std::endl;
     }
     // Write the json to the file
-    outFile << metrics.dump(4);
+    outFile << metrics.dump();
     // Close the file
     outFile.close();
     std::cout << "Metrics saved to file " << metricPath << " successfully" << std::endl;

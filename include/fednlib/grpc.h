@@ -6,12 +6,15 @@
 #include <grpcpp/grpcpp.h>
 #include "fedn.grpc.pb.h"
 #include "fedn.pb.h"
+#include "nlohmann/json.hpp"
 
 using grpc::ChannelInterface;
 using fedn::Connector;
 using fedn::Combiner;
 using fedn::ModelService;
 using fedn::TaskRequest;
+
+using json = nlohmann::json;
 
 class GrpcClient {
 public:
@@ -25,7 +28,7 @@ public:
     void ValidateGlobalModel(const std::string& modelID, TaskRequest& requestData);
     virtual void Validate(const std::string& inModelPath, const std::string& outMetricPath);
     void SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config);
-    void SendModelValidation(const std::string& modelID, const std::string& metricData, TaskRequest& requestData);
+    void SendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData);
     void SetName(const std::string& name);
     void SetId(const std::string& id);
     void SetChunkSize(std::size_t chunkSize);

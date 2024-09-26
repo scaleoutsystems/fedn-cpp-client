@@ -345,7 +345,7 @@ void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelU
     // Garbage collect the client object.
     Client *clientCollect = modelUpdate.release_sender();
 }
-void GrpcClient::SendModelValidation(const std::string& modelID, const std::string& metricData, TaskRequest& requestData) {
+void GrpcClient::SendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData) {
     // Send model validation response to server
     Client client;
     client.set_name(name_);
@@ -355,7 +355,7 @@ void GrpcClient::SendModelValidation(const std::string& modelID, const std::stri
     ModelValidation validation;
     validation.set_allocated_sender(&client);
     validation.set_model_id(modelID);
-    validation.set_data(metricData);
+    validation.set_data(metricData.dump());
     validation.set_session_id(requestData.session_id());
 
     // TODO: get metadata from Train function
@@ -421,7 +421,7 @@ void GrpcClient::ValidateGlobalModel(const std::string& modelID, TaskRequest& re
     json metricData = LoadMetricsFromFile(metricPath);
 
     // Send model validation response to server
-    GrpcClient::SendModelValidation(modelID, metricData.dump(), requestData);
+    GrpcClient::SendModelValidation(modelID, metricData, requestData);
 
     // Delete metrics file from disk
     DeleteFileFromDisk(metricPath);
