@@ -88,10 +88,21 @@ target_link_libraries(fedn_grpc_proto
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
 
-# # Add fednlib as a library
-add_library(fednlib STATIC "src/fednlib.cpp")
+# Include directories fednlib
+include_directories(include)
 
-# # Link the fednlib with libraries
+# Source files fednlib
+set(SOURCES
+    src/http.cpp
+    src/grpc.cpp
+    src/fedn.cpp
+    src/utils.cpp
+)
+
+# Add fednlib as a library
+add_library(fednlib STATIC ${SOURCES})
+
+# Link the fednlib with libraries
 target_link_libraries(fednlib PRIVATE 
 fedn_grpc_proto 
 absl::flags 
