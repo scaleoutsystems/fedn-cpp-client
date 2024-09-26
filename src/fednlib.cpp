@@ -531,13 +531,19 @@ json LoadMetricsFromFile(const std::string& metricPath) {
  */
 void SaveMetricsToFile(const json& metrics, const std::string& metricPath) {
     // Create an ofstream object and open the file in binary mode
+    // Ensure that metrics is a json object and not an array
+    if (!metrics.is_object()) {
+        std::cerr << "WARNING: Metrics must be a JSON object, arrays are not allowed." << std::endl;
+    }
+
+
     std::ofstream outFile(metricPath);
     // Check if the file was opened successfully
     if (!outFile) {
         std::cerr << "Error opening file for writing" << std::endl;
     }
     // Write the json to the file
-    outFile << metrics.dump(4);
+    outFile << metrics.dump();
     // Close the file
     outFile.close();
     std::cout << "Metrics saved to file " << metricPath << " successfully" << std::endl;
@@ -669,7 +675,7 @@ void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelU
     // Garbage collect the client object.
     Client *clientCollect = modelUpdate.release_sender();
 }
-void GrpcClient::SendModelValidation(const std::string& modelID, const std::string& metricData, TaskRequest& requestData) {
+void GrpcClient::SendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData) {
     // Send model validation response to server
     Client client;
     client.set_name(name_);
@@ -679,7 +685,7 @@ void GrpcClient::SendModelValidation(const std::string& modelID, const std::stri
     ModelValidation validation;
     validation.set_allocated_sender(&client);
     validation.set_model_id(modelID);
-    validation.set_data(metricData);
+    validation.set_data(metricData.dump());
     validation.set_session_id(requestData.session_id());
 
     // TODO: get metadata from Train function
@@ -745,7 +751,7 @@ void GrpcClient::ValidateGlobalModel(const std::string& modelID, TaskRequest& re
     json metricData = LoadMetricsFromFile(metricPath);
 
     // Send model validation response to server
-    GrpcClient::SendModelValidation(modelID, metricData.dump(), requestData);
+    GrpcClient::SendModelValidation(modelID, metricData, requestData);
 
     // Delete metrics file from disk
     DeleteFileFromDisk(metricPath);

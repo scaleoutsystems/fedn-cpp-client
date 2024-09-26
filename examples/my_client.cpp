@@ -36,10 +36,10 @@ public:
         std::string modelData = LoadModelFromFile(inModelPath);
         std::cout << "USER-DEFINED CODE: Validating model..." << std::endl;
 
-        // Dummy code: validate model
+        // Dummy code: validate model, OBS json must be an object, arrays sush as {"acc":1,"loss":2} are not allowed.
         json metrics = {
-            "accuracy", "0.95",
-            "loss", "0.05"
+            {"accuracy", 0.95},
+            {"loss", 0.05}
         };
         SaveMetricsToFile(metrics, outMetricPath);
     }
