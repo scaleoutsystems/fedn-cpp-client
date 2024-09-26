@@ -45,7 +45,7 @@ class HttpClient {
 public:
     HttpClient(const std::string& apiUrl, const std::string& token);
     ~HttpClient();
-    json assign(const json& requestData);
+    json assign(std::map<std::string, std::string> controllerConfig);
     std::string getToken();
 
 private:
@@ -92,21 +92,24 @@ public:
     std::shared_ptr<GrpcClient> getGrpcClient();
 
     void setAuthScheme(std::string authScheme);
-    void setHost(std::string host);
+    void setCombinerHost(std::string host);
     void setInsecure(bool insecure);
     void setProxyHost(std::string proxyHost);
     void setToken(std::string token);
+    void setApiUrl(std::string apiUrl);
+    void setClientId(std::string clientId);
+    void setName(std::string name);
+    void setPackage(std::string package);
+    void setPreferredCombiner(std::string preferredCombiner);
 
 private:
     std::shared_ptr<GrpcClient> grpcClient;
     std::shared_ptr<HttpClient> httpClient;
     std::shared_ptr<ChannelInterface> channel;
-    json controllerConfig;
+    std::map<std::string, std::string> controllerConfig;
     std::map<std::string, std::string> combinerConfig;
-    // json commandLineArguments;
 
     std::map<std::string, std::string> assign();
-    // void readCommandLineArguments(int argc, char** argv);
 };
 
 #endif // CLIENTLIB_H
