@@ -91,15 +91,23 @@ HttpClient::~HttpClient() {
     }
 }
 
-json HttpClient::assign(const json& requestData) {
+json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
+    // Get request body as JSON
+    json requestData = {
+        {"client_id", controllerConfig["client_id"]},
+        {"name", controllerConfig["name"]},
+        {"package", controllerConfig["package"]},
+        {"preferred_combiner", controllerConfig["preferred_combiner"]}
+    };
+    
     // Convert the JSON data to a string
     std::string jsonData = requestData.dump();
 
     // add endpoint /add_client to the apiUrl
-    apiUrl += "/add_client";
+    const std::string addClientApiUrl = apiUrl + "/add_client";
 
     // Set libcurl options for the POST request
-    curl_easy_setopt(curl, CURLOPT_URL, apiUrl.c_str());
+    curl_easy_setopt(curl, CURLOPT_URL, addClientApiUrl.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonData.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     // allow all redirects
@@ -168,34 +176,6 @@ json HttpClient::assign(const json& requestData) {
 }
 
 std::string HttpClient::getToken() {
-    return token;
-}
-
-std::string readApiUrl(YAML::Node config) {
-    // Read API endpoint URL from the config
-    const std::string apiUrl = config["discover_host"].as<std::string>();
-
-    // Check if the API URL is valid
-    if (apiUrl.empty()) {
-        throw std::runtime_error("Invalid API URL.");
-    }
-
-    return apiUrl;
-}
-
-std::string readToken(YAML::Node config) {
-    // Check if there is a "token" key in the config
-    std::string token;
-    if (config["token"]) {
-        token = config["token"].as<std::string>();
-        // Check if the token is valid
-
-        // TODO Is it necessary to check if token is string? Check in the original code!
-        if (token.empty()) { // && !config["token"].is_string()) {
-            throw std::runtime_error("Invalid token.");
-        }
-    }
-
     return token;
 }
 
@@ -833,10 +813,29 @@ std::map<std::string, std::string> readCombinerConfig(YAML::Node configFile) {
     return combinerConfig;
 }
 
-json readControllerConfig(YAML::Node config) {
+std::map<std::string, std::string> readControllerConfig(YAML::Node config) {
     // Read requestData from the config
     std::cout << "Reading HTTP request data from config file" << std::endl;
-    json controllerConfig;
+    std::map<std::string, std::string> controllerConfig;
+
+    // Check if there is a valid "discover_host" key in the config
+    std::string apiUrl = config["discover_host"].as<std::string>();
+    if (apiUrl.empty()) {
+        throw std::runtime_error("Invalid discover_host.");
+    }
+    controllerConfig["api_url"] = "https://" + apiUrl;
+
+    // Check if there is a "token" key in the config file
+    std::string token = "";
+    if (config["token"]) {
+        token = config["token"].as<std::string>();
+        // Check if the "token" value is valid
+        if (token.empty()) {
+            throw std::runtime_error("Invalid token.");
+        }
+    }
+    controllerConfig["token"] = token;
+
     controllerConfig["client_id"] = config["client_id"].as<std::string>();
     controllerConfig["name"] = config["name"].as<std::string>();
     if (config["package"]) {
@@ -844,19 +843,10 @@ json readControllerConfig(YAML::Node config) {
     } else {
         controllerConfig["package"] = "remote";
     }
-
-    // Check if the client_id is valid
-    if (!controllerConfig["client_id"].is_string()) {
-        throw std::runtime_error("Invalid client_id.");
-    }
     
     // Check if preferred_combiner is in the config, else use default empty string
     if (config["preferred_combiner"]) {
         controllerConfig["preferred_combiner"] = config["preferred_combiner"].as<std::string>();
-        // Check if the preferred_combiner is valid
-        if (!controllerConfig["preferred_combiner"].is_string()) {
-            throw std::runtime_error("Invalid preferred_combiner.");
-        }
     } else {
         controllerConfig["preferred_combiner"] = "";
     }
@@ -871,14 +861,8 @@ FednClient::FednClient(std::string configFilePath) {
     controllerConfig = readControllerConfig(config);
     combinerConfig = readCombinerConfig(config);
 
-    // Read API endpoint URL from the config
-    const std::string apiUrl = "https://" + readApiUrl(config);
-    
-    // Check if there is a "token" key in the config
-    std::string token = readToken(config);
-
     // Create a Client instance with the API URL and token (if provided)
-    httpClient = std::make_shared<HttpClient>(apiUrl, token);
+    httpClient = std::make_shared<HttpClient>(controllerConfig["api_url"], controllerConfig["token"]);
 }
 
 std::map<std::string, std::string> FednClient::getCombinerConfig() {
@@ -1016,7 +1000,7 @@ void FednClient::setAuthScheme(std::string authScheme) {
     combinerConfig["auth_scheme"] = authScheme;
 }
 
-void FednClient::setHost(std::string host) {
+void FednClient::setCombinerHost(std::string host) {
     combinerConfig["host"] = host;
 }
 
@@ -1029,5 +1013,6 @@ void FednClient::setProxyHost(std::string proxyHost) {
 }
 
 void FednClient::setToken(std::string token) {
+    controllerConfig["token"] = token;
     combinerConfig["token"] = token;
 }
