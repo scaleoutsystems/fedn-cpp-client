@@ -749,6 +749,8 @@ void GrpcClient::ValidateGlobalModel(const std::string& modelID, TaskRequest& re
 
     // Delete metrics file from disk
     DeleteFileFromDisk(metricPath);
+    // Delete model from disk
+    DeleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
 }
 
 /**
