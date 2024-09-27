@@ -19,20 +19,20 @@ using json = nlohmann::json;
 class GrpcClient {
 public:
     GrpcClient(std::shared_ptr<ChannelInterface> channel);
-    void HeartBeat();
-    void ConnectTaskStream();
-    std::string DownloadModel(const std::string& modelID);
-    void UploadModel(std::string& modelID, std::string& modelData);
-    virtual void UpdateLocalModel(const std::string& modelID, const std::string& requestData);
-    virtual void Train(const std::string& inModelPath, const std::string& outModelPath);
-    void ValidateGlobalModel(const std::string& modelID, TaskRequest& requestData);
-    virtual void Validate(const std::string& inModelPath, const std::string& outMetricPath);
-    void SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config);
-    void SendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData);
-    void SetName(const std::string& name);
-    void SetId(const std::string& id);
-    void SetChunkSize(std::size_t chunkSize);
-    size_t GetChunkSize();
+    void heartBeat();
+    void connectTaskStream();
+    std::string downloadModel(const std::string& modelID);
+    void uploadModel(std::string& modelID, std::string& modelData);
+    virtual void updateLocalModel(const std::string& modelID, const std::string& requestData);
+    virtual void train(const std::string& inModelPath, const std::string& outModelPath);
+    void validateGlobalModel(const std::string& modelID, TaskRequest& requestData);
+    virtual void validate(const std::string& inModelPath, const std::string& outMetricPath);
+    void sendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config);
+    void sendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData);
+    void setName(const std::string& name);
+    void setId(const std::string& id);
+    void setChunkSize(std::size_t chunkSize);
+    size_t getChunkSize();
 
 private:
     std::unique_ptr<Connector::Stub> connectorStub_;
@@ -43,6 +43,6 @@ private:
     std::size_t chunkSize; // 1 MB by default, change this to suit your needs
 };
 
-void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds);
+void sendIntervalHeartBeat(GrpcClient* client, int intervalSeconds);
 
 #endif // GRPCCLIENT_H

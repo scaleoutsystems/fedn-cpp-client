@@ -6,29 +6,35 @@
 #include "../include/fednlib/utils.h"
 
 /**
- * Callback for handling data received from a network request.
- * It appends the received HTTP response data to the provided output string.
- * 
+ * @brief Callback function for writing received data to a string.
+ *
+ * This function is used as a callback for handling data received from a HTTP request.
+ * It appends the received data to the provided output string.
+ *
  * @param contents Pointer to the data received.
  * @param size Size of each data element.
  * @param nmemb Number of data elements.
  * @param output Pointer to the string where the received data will be appended.
  * @return The total size of the data processed (size * nmemb).
  */
-size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
+size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
     size_t totalSize = size * nmemb;
     output->append(static_cast<char*>(contents), totalSize);
     return totalSize;
 }
 
 /**
- * Save model to file.
+ * @brief Saves the given model data to a file at the specified path.
  *
- * @param modelData The model data to save.
- * @param modelID The model ID to save. Will be used as filename.
- * @param path The path to save the model to.
+ * This function writes the binary string representation of the model data
+ * to a file. It opens the file in binary mode and writes the data to it.
+ * If the file cannot be opened, an error message is printed to the standard error.
+ * Upon successful completion, a success message is printed to the standard output.
+ *
+ * @param modelData The binary string representation of the model data to be saved.
+ * @param modelPath The file path where the model data should be saved.
  */
-void SaveModelToFile(const std::string& modelData, const std::string& modelPath) {
+void saveModelToFile(const std::string& modelData, const std::string& modelPath) {
     // Write the binary string to a file
     // Create an ofstream object and open the file in binary mode
     std::ofstream outFile(modelPath, std::ios::binary);
@@ -48,12 +54,16 @@ void SaveModelToFile(const std::string& modelData, const std::string& modelPath)
 }
 
 /**
- * Save metrics to file.
+ * @brief Saves the provided JSON metrics to a file.
+ *
+ * This function takes a JSON object containing metrics and writes it to a specified file path.
+ *
+ * @param metrics The JSON object containing the metrics to be saved.
+ * @param metricPath The file path where the metrics should be saved.
  * 
- * @param metrics The metrics to save, as a JSON object.
- * @param metricPath The path to save the metrics to.
+ * @note The JSON object must be an object and not an array.
  */
-void SaveMetricsToFile(const json& metrics, const std::string& metricPath) {
+void saveMetricsToFile(const json& metrics, const std::string& metricPath) {
     // Create an ofstream object and open the file in binary mode
     // Ensure that metrics is a json object and not an array
     if (!metrics.is_object()) {
@@ -74,13 +84,15 @@ void SaveMetricsToFile(const json& metrics, const std::string& metricPath) {
 }
 
 /**
- * Load model from file.
+ * @brief Loads the content of a model file into a string.
  *
- * @param modelID The model ID to load. Will be used as filename.
- * @param path The path to load the model from.
- * @return String containing binary data of the model.
+ * This function reads the entire content of a file specified by the given 
+ * file path and returns it as a string. The file is read in binary mode.
+ *
+ * @param modelPath The path to the model file to be loaded.
+ * @return A string containing the content of the model file.
  */
-std::string LoadModelFromFile(const std::string& modelPath) {
+std::string loadModelFromFile(const std::string& modelPath) {
     // Create an ifstream object and open the file in binary mode
     std::ifstream inFile(modelPath, std::ios::binary);
     // Check if the file was opened successfully
@@ -102,12 +114,16 @@ std::string LoadModelFromFile(const std::string& modelPath) {
 }
 
 /**
- * Load metrics from file.
- * 
- * @param metricPath The path to load the metrics from.
- * @return JSON object containing the metrics.
+ * @brief Loads metrics from a JSON file.
+ *
+ * This function reads a JSON file from the specified path and parses its contents
+ * into a json object. If the file cannot be opened or the JSON parsing fails, 
+ * appropriate error messages are printed to the standard error output.
+ *
+ * @param metricPath The path to the JSON file containing the metrics.
+ * @return A json object containing the parsed metrics data.
  */
-json LoadMetricsFromFile(const std::string& metricPath) {
+json loadMetricsFromFile(const std::string& metricPath) {
     // Create an ifstream object and open the file as json
     std::ifstream inFile(metricPath);
     // Check if the file was opened successfully
@@ -130,11 +146,15 @@ json LoadMetricsFromFile(const std::string& metricPath) {
 }
 
 /**
- * Delete file from disk.
- *
- * @param path The path to delete the model from.
+ * @brief Deletes a file from the disk at the specified path.
+ * 
+ * This function attempts to delete the file located at the given path.
+ * If the file is successfully deleted, a success message is printed to the console.
+ * If the file cannot be deleted, an error message is printed to the console.
+ * 
+ * @param path The path to the file that needs to be deleted.
  */
-void DeleteFileFromDisk(const std::string& path) {
+void deleteFileFromDisk(const std::string& path) {
     // Delete the file
     if (remove((path).c_str()) != 0) {
         std::cerr << "Error deleting file" << std::endl;
@@ -145,9 +165,13 @@ void DeleteFileFromDisk(const std::string& path) {
 }
 
 /**
- * Generate a random UUID version 4 string.
+ * @brief Generates a random UUID (Universally Unique Identifier).
  *
- * @return A random UUID version 4 string.
+ * This function creates a random UUID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx,
+ * where each 'x' is a hexadecimal digit (0-9, a-f). The UUID is generated using a 
+ * random number generator.
+ *
+ * @return A string representing the generated UUID.
  */
 std::string generateRandomUUID() {
     std::random_device rd;
@@ -166,6 +190,18 @@ std::string generateRandomUUID() {
     return ss.str();
 }
 
+/**
+ * @brief Reads the combiner configuration from a YAML configuration file.
+ *
+ * This function extracts various configuration parameters related to the combiner
+ * from the provided YAML node and stores them in a map. The expected parameters
+ * include "combiner", "proxy_server", "insecure", "token", and "auth_scheme".
+ * Default values are provided for "insecure" (false) and "auth_scheme" (Bearer)
+ * if they are not specified in the configuration file.
+ *
+ * @param configFile A YAML::Node object representing the configuration file.
+ * @return A map containing the combiner configuration parameters as key-value pairs.
+ */
 std::map<std::string, std::string> readCombinerConfig(YAML::Node configFile) {
     // Read HTTP configuration from the "client.yaml" file
     std::map<std::string, std::string> combinerConfig;
@@ -195,6 +231,17 @@ std::map<std::string, std::string> readCombinerConfig(YAML::Node configFile) {
     return combinerConfig;
 }
 
+/**
+ * @brief Reads the controller configuration from a YAML node.
+ *
+ * This function extracts various configuration parameters from the provided
+ * YAML node and stores them in a map. The configuration parameters include
+ * API URL, token, client ID, name, package, and preferred combiner.
+ *
+ * @param config The YAML node containing the configuration data.
+ * @return A map containing the configuration parameters as key-value pairs.
+ * @throws std::runtime_error if the "discover_host" or "token" values are invalid.
+ */
 std::map<std::string, std::string> readControllerConfig(YAML::Node config) {
     // Read requestData from the config
     std::cout << "Reading HTTP request data from config file" << std::endl;

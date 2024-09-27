@@ -41,7 +41,7 @@ private:
     std::map<std::string, std::string> controllerConfig;
     std::map<std::string, std::string> combinerConfig;
 
-    std::map<std::string, std::string> assign();
+    std::map<std::string, std::string> assignCombiner();
 };
 
 #endif // FEDNCLIENT_H

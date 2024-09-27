@@ -42,6 +42,17 @@ private:
     grpc::string value_;
 };
 
+
+/**
+ * @brief Constructs a new FednClient object.
+ * 
+ * This constructor initializes the FednClient by reading the client configuration
+ * from the specified YAML file. It sets up the controller and combiner
+ * configurations and creates an HTTP client instance with the API URL and token
+ * provided in the configuration file.
+ * 
+ * @param configFilePath The path to the YAML configuration file.
+ */
 FednClient::FednClient(std::string configFilePath) {
     // Read HTTP configuration from the "client.yaml" file
     YAML::Node config = YAML::LoadFile(configFilePath);
@@ -52,6 +63,15 @@ FednClient::FednClient(std::string configFilePath) {
     httpClient = std::make_shared<HttpClient>(controllerConfig["api_url"], controllerConfig["token"]);
 }
 
+/**
+ * @brief Retrieves the combiner configuration for the FednClient.
+ *
+ * This function checks if the "host" entry in the combiner configuration is empty.
+ * If it is empty, it assigns a new combiner configuration by calling the assignCombiner() method.
+ * The function returns the combiner configuration as a map of string key-value pairs.
+ *
+ * @return std::map<std::string, std::string> The combiner configuration.
+ */
 std::map<std::string, std::string> FednClient::getCombinerConfig() {
     #ifdef DEBUG
     std::cout << "DEBUG Combiner configuration PRE-ASSIGNMENT:" << std::endl;
@@ -62,7 +82,7 @@ std::map<std::string, std::string> FednClient::getCombinerConfig() {
     
     if (combinerConfig["host"].empty()) {
         // Assign to combiner
-        combinerConfig = assign();
+        combinerConfig = assignCombiner();
         #ifdef DEBUG
         std::cout << "DEBUG Combiner configuration POST-ASSIGNMENT:" << std::endl;
         for (auto const& x : combinerConfig) {
@@ -73,25 +93,51 @@ std::map<std::string, std::string> FednClient::getCombinerConfig() {
     return combinerConfig;
 }
 
+/**
+ * @brief Retrieves the channel associated with the FednClient.
+ * 
+ * This function returns a shared pointer to the ChannelInterface that
+ * represents the communication channel used by the FednClient.
+ * 
+ * @return std::shared_ptr<ChannelInterface> The shared pointer to the channel.
+ */
 std::shared_ptr<ChannelInterface> FednClient::getChannel() {
     return channel;
 }
 
+/**
+ * @brief Runs the FednClient with a custom gRPC client.
+ * 
+ * This function sets the name and ID of the gRPC client based on the controller
+ * configuration. It then starts the heart beat thread and listens to model update
+ * requests from the combiner.
+ * 
+ * @param customGrpcClient The custom gRPC client to run.
+ */
 void FednClient::run(std::shared_ptr<GrpcClient> customGrpcClient) {
     // Add the custom gRPC client to the FednClient object
     grpcClient = customGrpcClient;
 
     // Set name, id and chunk size
-    grpcClient->SetName(controllerConfig["name"]);
-    grpcClient->SetId(controllerConfig["client_id"]);
+    grpcClient->setName(controllerConfig["name"]);
+    grpcClient->setId(controllerConfig["client_id"]);
 
     // Start heart beat thread and listen to model update requests
-    std::thread HeartBeatThread(SendIntervalHeartBeat, grpcClient.get(), 10);
-    grpcClient->ConnectTaskStream();
+    std::thread HeartBeatThread(sendIntervalHeartBeat, grpcClient.get(), 10);
+    grpcClient->connectTaskStream();
     HeartBeatThread.join();
 }
 
-std::map<std::string, std::string> FednClient::assign() {
+/**
+ * @brief Assigns the client to a combiner.
+ * 
+ * This function sends an HTTP request to the controller to assign the client to a combiner.
+ * It then extracts the host and token from the response and sets the combiner configuration
+ * accordingly. The function returns the combiner configuration as a map of string key-value pairs.
+ * 
+ * @return std::map<std::string, std::string> The combiner configuration.
+ */
+std::map<std::string, std::string> FednClient::assignCombiner() {
     // Request assignment to combiner
     json httpResponseData = httpClient->assign(controllerConfig);
 
@@ -106,11 +152,19 @@ std::map<std::string, std::string> FednClient::assign() {
     return combinerConfig;
 }
 
+/**
+ * @brief Sets up the gRPC channel for the FednClient.
+ * 
+ * This function sets up the gRPC channel based on the combiner configuration provided.
+ * It initializes the credentials based on the "insecure" flag and the "token" and "auth_scheme"
+ * values in the combiner configuration. It then creates a channel using the specified host and
+ * credentials. If a proxy host is provided, the host is set to the proxy host and the server host
+ * is set in the metadata. The function returns a shared pointer to the ChannelInterface.
+ * 
+ * @param combinerConfig The combiner configuration.
+ * @return std::shared_ptr<ChannelInterface> The shared pointer to the channel.
+ */
 std::shared_ptr<ChannelInterface> FednClient::setupGrpcChannel(std::map<std::string, std::string> combinerConfig) {
-    // Instantiate the client. It requires a channel, out of which the actual RPCs
-    // are created. This channel models a connection to an server specified by
-    // the argument "--target=".
-
     std::cout << "Server host: " << combinerConfig["host"] << std::endl;
 
     // initialize credentials
@@ -175,30 +229,87 @@ std::shared_ptr<ChannelInterface> FednClient::setupGrpcChannel(std::map<std::str
     return channel;
 }
 
+
+/**
+ * @brief Retrieves the gRPC client instance.
+ *
+ * This function returns a shared pointer to the gRPC client instance
+ * associated with the FednClient.
+ *
+ * @return std::shared_ptr<GrpcClient> A shared pointer to the gRPC client.
+ */
 std::shared_ptr<GrpcClient> FednClient::getGrpcClient() {
     return grpcClient;
 }
 
+/**
+ * @brief Retrieves the HTTP client instance.
+ * 
+ * This function returns a shared pointer to the HttpClient instance
+ * used by the FednClient.
+ * 
+ * @return std::shared_ptr<HttpClient> A shared pointer to the HttpClient instance.
+ */
 std::shared_ptr<HttpClient> FednClient::getHttpClient() {
     return httpClient;
 }
 
+/**
+ * @brief Sets the authentication scheme for the FednClient.
+ * 
+ * This method updates the combiner configuration with the specified 
+ * authentication scheme.
+ * 
+ * @param authScheme A string representing the authentication scheme to be set.
+ */
 void FednClient::setAuthScheme(std::string authScheme) {
     combinerConfig["auth_scheme"] = authScheme;
 }
 
+/**
+ * @brief Sets the host address for the combiner configuration.
+ * 
+ * This function updates the combiner configuration with the specified host address.
+ * 
+ * @param host A string representing the host address to be set in the combiner configuration.
+ */
 void FednClient::setCombinerHost(std::string host) {
     combinerConfig["host"] = host;
 }
 
+/**
+ * @brief Sets the insecure mode for the FednClient.
+ *
+ * This method configures the client to operate in insecure mode if the 
+ * parameter is set to true.
+ *
+ * @param insecure A boolean value indicating whether to enable insecure mode.
+ *                 - true: Enable insecure mode.
+ *                 - false: Disable insecure mode.
+ */
 void FednClient::setInsecure(bool insecure) {
     combinerConfig["insecure"] = insecure ? "true" : "false";
 }
 
+/**
+ * @brief Sets the proxy host for the FednClient.
+ * 
+ * This function updates the combiner configuration with the specified proxy host.
+ * 
+ * @param proxyHost The proxy host to be set.
+ */
 void FednClient::setProxyHost(std::string proxyHost) {
     combinerConfig["proxy_host"] = proxyHost;
 }
 
+/**
+ * @brief Sets the token for the FednClient.
+ * 
+ * This method updates the token in both the controllerConfig and combinerConfig
+ * with the provided token string.
+ * 
+ * @param token The token string to be set.
+ */
 void FednClient::setToken(std::string token) {
     controllerConfig["token"] = token;
     combinerConfig["token"] = token;

@@ -4,11 +4,11 @@ A FEDn client in C++.
 **Note:** This is a prototype and is still in active development so the interface might change frequently! The purpose of this prototype is to demonstrate how the C++ client can be used to connect to the federated network. In the example below, there is no actual model training being performed on the client.
 
 ## fednlib API
-To create a FEDn client in C++, the user creates a C++ source file where they implement their machine learning code and use the FEDn library API `fednlib` to connect the client to the federated network. The file `my_client.cpp` in the `examples` folder shows how the user implements their own machine learning code by overriding the methods `Train`and `Validate` of the `GrpcClient` class, and connect the client to the network in the `main` function.
+To create a FEDn client in C++, the user creates a C++ source file where they implement their machine learning code and use the FEDn library API `fednlib` to connect the client to the federated network. The file `my_client.cpp` in the `examples` folder shows how the user implements their own machine learning code by overriding the methods `train`and `validate` of the `GrpcClient` class, and connect the client to the network in the `main` function.
 
-* `Train`: The user starts by reading the model from a binary file into the preferred format (depending on the ML library that is used), implements the machine learning logic, and saves the updated model back to a file in binary format. In the example `my_client.cpp`, this function simply reads the global model into memory and writes it back to file.
-* `Validate`: The user starts by reading the model from a binary file, computes the preferred validation metrics, saves the metrics in a JSON object and writes the JSON to file. In the example `my_client.cpp`, this function creates a JSON with mock validation data and writes it to file.
-* `main`: The user starts by creating an object of the class `FednClient`, passing the client configuration file path to the constructor. Then the user gets the combiner configuration from the `FednClient` object and uses it to setup a gRPC channel. Then the user creates an object of the custom class which inherits from `GrpcCient` and overrides the functions `Train` and `Validate` as described above, passing the gRPC channel to the constructor. Finally the user invokes the `run` method on the `FednClient` object to connect the client to the task stream from the assigned combiner.
+* `train`: The user starts by reading the model from a binary file into the preferred format (depending on the ML library that is used), implements the machine learning logic, and saves the updated model back to a file in binary format. In the example `my_client.cpp`, this function simply reads the global model into memory and writes it back to file.
+* `validate`: The user starts by reading the model from a binary file, computes the preferred validation metrics, saves the metrics in a JSON object and writes the JSON to file. In the example `my_client.cpp`, this function creates a JSON with mock validation data and writes it to file.
+* `main`: The user starts by creating an object of the class `FednClient`, passing the client configuration file path to the constructor. Then the user gets the combiner configuration from the `FednClient` object and uses it to setup a gRPC channel. Then the user creates an object of the custom class which inherits from `GrpcCient` and overrides the functions `train` and `validate` as described above, passing the gRPC channel to the constructor. Finally the user invokes the `run` method on the `FednClient` object to connect the client to the task stream from the assigned combiner.
 
 Below are instruction for building the library and client executable from source.
 
@@ -85,21 +85,21 @@ The expected output should be similar to this:
 
 The client is then waiting for model update requests from the combiner. **Start** a training session either via the Studio dashboard or the Python APIClient. The expected output should look similar to this:
 
-    TaskRequest ModelID: 74ad18ce-a3f7-4b48-8506-1bd16e76e3f1
+    TaskRequest ModelID: 7f37dd0d-e067-4ebc-9707-21ed72b41077
     TaskRequest: TaskType:2
-    Updating local model: 74ad18ce-a3f7-4b48-8506-1bd16e76e3f1
-    Downloading model: 74ad18ce-a3f7-4b48-8506-1bd16e76e3f1
-    ModelResponseID: 74ad18ce-a3f7-4b48-8506-1bd16e76e3f1
+    Updating local model: 7f37dd0d-e067-4ebc-9707-21ed72b41077
+    Downloading model: 7f37dd0d-e067-4ebc-9707-21ed72b41077
+    ModelResponseID: 7f37dd0d-e067-4ebc-9707-21ed72b41077
     ModelResponseStatus: 1
-    Download in progress: 74ad18ce-a3f7-4b48-8506-1bd16e76e3f1
+    Download in progress: 7f37dd0d-e067-4ebc-9707-21ed72b41077
     Downloaded size: 193561 bytes
-    ModelResponseID: 74ad18ce-a3f7-4b48-8506-1bd16e76e3f1
+    ModelResponseID: 7f37dd0d-e067-4ebc-9707-21ed72b41077
     ModelResponseStatus: 0
-    Download complete for model: 74ad18ce-a3f7-4b48-8506-1bd16e76e3f1
+    Download complete for model: 7f37dd0d-e067-4ebc-9707-21ed72b41077
     Downloaded size: 193561 bytes
     Disconnecting from DownloadStream
-    Saving model to file: 74ad18ce-a3f7-4b48-8506-1bd16e76e3f1
-    ...
+    Saving model to file: 7f37dd0d-e067-4ebc-9707-21ed72b41077
+    modelData saved to file ./7f37dd0d-e067-4ebc-9707-21ed72b41077.bin successfully
 
 You can now check the model trail through the Python APIClient, the length of the list should be greater than 1. If you are using Studio, you can also see the model updates in the dashboard.
 

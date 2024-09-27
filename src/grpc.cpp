@@ -26,14 +26,33 @@ using fedn::ClientAvailableMessage;
 using fedn::WORKER;
 using fedn::Response;
 
+/**
+ * @brief Constructs a new GrpcClient object.
+ * 
+ * This constructor initializes the GrpcClient with the provided gRPC channel.
+ * It creates stubs for the Connector, Combiner, and ModelService services.
+ * Additionally, it sets the default chunk size for data transfer.
+ * 
+ * @param channel A shared pointer to a gRPC ChannelInterface used to communicate with the server.
+ */
 GrpcClient::GrpcClient(std::shared_ptr<ChannelInterface> channel)
       : connectorStub_(Connector::NewStub(channel)),
         combinerStub_(Combiner::NewStub(channel)),
         modelserviceStub_(ModelService::NewStub(channel)) {
-            this->SetChunkSize(1024 * 1024);
+            this->setChunkSize(1024 * 1024);
         }
 
-void GrpcClient::HeartBeat() {
+/**
+ * @brief Sends a heartbeat message to the server.
+ *
+ * This function creates a heartbeat message containing client information 
+ * and sends it to the server using gRPC. It prints the server's response 
+ * and handles any errors that occur during the RPC.
+ *
+ * The heartbeat message includes the client's name, role, and ID. The 
+ * server's response is printed to the standard output.
+ */
+void GrpcClient::heartBeat() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
@@ -68,7 +87,18 @@ void GrpcClient::HeartBeat() {
     }
 }
 
-void GrpcClient::ConnectTaskStream() {
+/**
+ * @brief Establishes a connection to the TaskStream and processes incoming tasks.
+ * 
+ * This function sets up a gRPC client, sends a ClientAvailableMessage to the server,
+ * and listens for TaskRequest messages from the combiner. Depending on the type of 
+ * TaskRequest received, it performs different actions such as updating the local model,
+ * validating the global model, or handling model inference.
+ * 
+ * @note The function currently only handles MODEL_UPDATE and MODEL_VALIDATION task types.
+ *       Model inference is not yet implemented.
+ */
+void GrpcClient::connectTaskStream() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
@@ -94,11 +124,10 @@ void GrpcClient::ConnectTaskStream() {
       std::cout << "TaskRequest ModelID: " << task.model_id() << std::endl;
       std::cout << "TaskRequest: TaskType:" << task.type() << std::endl;
       if (task.type() == StatusType::MODEL_UPDATE) {
-        this->UpdateLocalModel(task.model_id(), task.data());
+        this->updateLocalModel(task.model_id(), task.data());
       }
       else if (task.type() == StatusType::MODEL_VALIDATION) {
-        // TODO: Implement model validation
-        this->ValidateGlobalModel(task.model_id(), task);
+        this->validateGlobalModel(task.model_id(), task);
       }
       else if (task.type() == StatusType::INFERENCE) {
         // TODO: Implement model inference
@@ -111,11 +140,16 @@ void GrpcClient::ConnectTaskStream() {
 }
 
 /**
-* Download global model from server.
-*
-* @return A vector of char containing the model data.
-*/
-std::string GrpcClient::DownloadModel(const std::string& modelID) {
+ * @brief Downloads a model from the server using the provided model ID.
+ *
+ * This function sends a request to the server to download a model identified by the given model ID.
+ * It reads the model data from the server in a streaming manner and accumulates the data until the
+ * download is complete or fails.
+ *
+ * @param modelID The ID of the model to be downloaded.
+ * @return A string containing the accumulated model data.
+ */
+std::string GrpcClient::downloadModel(const std::string& modelID) {
 
     // request 
     ModelRequest request;
@@ -161,13 +195,16 @@ std::string GrpcClient::DownloadModel(const std::string& modelID) {
 }
 
 /**
- * Upload local model to server in chunks.
+ * @brief Uploads a model to the server in chunks.
  * 
- * @param modelID The model ID to upload.
- * @param modelData The model data to upload.
- * @param chunkSize The size of each chunk to upload.
+ * This function uploads a model to the server by dividing the model data into chunks
+ * and sending each chunk sequentially. It uses gRPC for communication and handles
+ * the streaming of data to the server.
+ * 
+ * @param modelID The unique identifier for the model being uploaded.
+ * @param modelData The binary data of the model to be uploaded.
  */
-void GrpcClient::UploadModel(std::string& modelID, std::string& modelData) {
+void GrpcClient::uploadModel(std::string& modelID, std::string& modelData) {
     // response 
     ModelResponse response;
     // context
@@ -184,7 +221,7 @@ void GrpcClient::UploadModel(std::string& modelID, std::string& modelData) {
         modelserviceStub_->Upload(&context, &response));
 
     // Calculate the number of chunks
-    size_t chunkSize = this->GetChunkSize();
+    size_t chunkSize = this->getChunkSize();
     size_t totalSize = modelData.size();
     size_t offset = 0;
 
@@ -234,71 +271,89 @@ void GrpcClient::UploadModel(std::string& modelID, std::string& modelData) {
 }
 
 /**
- * This function loads a the current local model from a file, trains the model and saves the model update to file.
+ * @brief (To override) Trains the model by loading it from a file, processing it, and saving the updated model to another file.
  * 
- * @param modelID The ID of the global model to be used as a seed.
- * @param modelUpdateID The ID for the updated local model.
- * @param path The path where the model files are located.
+ * This function should perform the following steps:
+ * 1. Load the model data from the specified input file path.
+ * 2. Process the model data with ML computations. Base version below just sends the same model back as an update.
+ * 3. Save the updated model data to the specified output file path in binary format.
+ * 
+ * @param inModelPath The file path to load the model data from.
+ * @param outModelPath The file path to save the updated model data to.
  */
-void GrpcClient::Train(const std::string& inModelPath, const std::string& outModelPath) {
+void GrpcClient::train(const std::string& inModelPath, const std::string& outModelPath) {
     // Using own code to load the matrix from a binary file, dymmy code. Remove if using Armadillo
-    std::string modelData = LoadModelFromFile(inModelPath);
+    std::string modelData = loadModelFromFile(inModelPath);
     
     // Send the same model back as update
     std::string modelUpdateData = modelData;
     
     // Using own code to save the matrix as a binary file, dymmy code. Remove if using Armadillo
-    SaveModelToFile(modelUpdateData, outModelPath);
+    saveModelToFile(modelUpdateData, outModelPath);
 }
 
 /**
- * Update local model with global model as "seed" model.
- * This is where ML code should be executed.
- *
- * @param modelID The model ID (Global) to update local model with.
- * @param requestData The data field from ModelUpdate request, should contain the round config
+ * @brief Updates the local model by downloading it from the server, training it, and uploading the updated model back to the server.
+ * 
+ * This function performs the following steps:
+ * 1. Downloads the model from the server using the provided model ID.
+ * 2. Saves the downloaded model to a file.
+ * 3. Generates a random UUID for the model update.
+ * 4. Trains the model using the saved file and generates an updated model file.
+ * 5. Loads the updated model from the file.
+ * 6. Uploads the updated model to the server.
+ * 7. Sends a model update response to the server.
+ * 8. Deletes the temporary model files from the disk.
+ * 
+ * @param modelID The ID of the model to be updated.
+ * @param requestData Additional request data to be sent with the model update via gRPC.
  */
-void GrpcClient::UpdateLocalModel(const std::string& modelID, const std::string& requestData) {
+void GrpcClient::updateLocalModel(const std::string& modelID, const std::string& requestData) {
     std::cout << "Updating local model: " << modelID << std::endl;
 
     // Download model from server
     std::cout << "Downloading model: " << modelID << std::endl;
-    std::string modelData = GrpcClient::DownloadModel(modelID);
+    std::string modelData = GrpcClient::downloadModel(modelID);
 
     // Save model to file
     // TODO: model should be saved to a temporary file and chunks should be written to it
     std::cout << "Saving model to file: " << modelID << std::endl;
-    SaveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
+    saveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
 
     // Create random UUID4 for model update
     std::string modelUpdateID = generateRandomUUID();
     std::cout << "Generated random UUID " << modelUpdateID << " for model update" << std::endl;
 
-    // Train the model
-    this->Train(std::string("./") + modelID + std::string(".bin"), std::string("./") + modelUpdateID + std::string(".bin"));
+    // train the model
+    this->train(std::string("./") + modelID + std::string(".bin"), std::string("./") + modelUpdateID + std::string(".bin"));
 
     // Read the binary string from the file
     std::cout << "Loading model from file: " << modelUpdateID << std::endl;
-    std::string data = LoadModelFromFile(std::string("./") + modelUpdateID + std::string(".bin"));
+    std::string data = loadModelFromFile(std::string("./") + modelUpdateID + std::string(".bin"));
 
     // Upload model to server
-    GrpcClient::UploadModel(modelUpdateID, data);
+    GrpcClient::uploadModel(modelUpdateID, data);
 
     // Send model update response to server
-    GrpcClient::SendModelUpdate(modelID, modelUpdateID, requestData);
+    GrpcClient::sendModelUpdate(modelID, modelUpdateID, requestData);
 
     // Delete model from disk
-    DeleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
-    DeleteFileFromDisk(std::string("./") + modelUpdateID + std::string(".bin"));
+    deleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
+    deleteFileFromDisk(std::string("./") + modelUpdateID + std::string(".bin"));
 }
+
 /**
- * Send model update message to server.
- *
- * @param modelID The model ID (Global) to send model update for.
- * @param modelUpdateID The model update ID (Local) to send model update for.
- * @param config The round config
+ * @brief Sends a model update to the server.
+ * 
+ * This function constructs a model update message and sends it to the server using gRPC.
+ * It includes metadata such as the client information, model ID, model update ID, timestamp,
+ * and configuration.
+ * 
+ * @param modelID The ID of the model being updated.
+ * @param modelUpdateID The ID of the model update.
+ * @param config The configuration string for the model update.
  */
-void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config) {
+void GrpcClient::sendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config) {
    // Send model update response to server
     Client client;
     client.set_name(name_);
@@ -320,7 +375,7 @@ void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelU
     std::string timeString = ss.str();
     modelUpdate.set_timestamp(timeString);
 
-    // TODO: get metadata from Train function
+    // TODO: get metadata from train function
     // string as json
     std::ostringstream oss;
     std::string metadata = "{\"training_metadata\": {\"epochs\": 1, \"batch_size\": 1, \"num_examples\": 3000}}";
@@ -331,21 +386,33 @@ void GrpcClient::SendModelUpdate(const std::string& modelID, std::string& modelU
     ClientContext context;
     Response response;
     Status status = combinerStub_->SendModelUpdate(&context, modelUpdate, &response);
-    std::cout << "SendModelUpdate: " << modelUpdate.model_id() << std::endl;
+    std::cout << "sendModelUpdate: " << modelUpdate.model_id() << std::endl;
 
     if (!status.ok()) {
-      std::cout << "SendModelUpdate: failed for model: " << modelID << std::endl;
+      std::cout << "sendModelUpdate: failed for model: " << modelID << std::endl;
       std::cout << status.error_code() << ": " << status.error_message()
                 << std::endl;
-      std::cout << "SendModelUpdate: Response: " << response.response() << std::endl;
+      std::cout << "sendModelUpdate: Response: " << response.response() << std::endl;
     }
     else {
-      std::cout << "SendModelUpdate: Response: " << response.response() << std::endl;
+      std::cout << "sendModelUpdate: Response: " << response.response() << std::endl;
     }
     // Garbage collect the client object.
     Client *clientCollect = modelUpdate.release_sender();
 }
-void GrpcClient::SendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData) {
+
+/**
+ * @brief Sends model validation data to the server.
+ *
+ * This function constructs a model validation message and sends it to the server
+ * using gRPC. It includes client information, model ID, metric data, session ID,
+ * metadata, and a timestamp.
+ *
+ * @param modelID The ID of the model being validated.
+ * @param metricData A JSON object containing the metric data for the model validation.
+ * @param requestData A TaskRequest object containing the session ID and other request data.
+ */
+void GrpcClient::sendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData) {
     // Send model validation response to server
     Client client;
     client.set_name(name_);
@@ -358,7 +425,7 @@ void GrpcClient::SendModelValidation(const std::string& modelID, json& metricDat
     validation.set_data(metricData.dump());
     validation.set_session_id(requestData.session_id());
 
-    // TODO: get metadata from Train function
+    // TODO: get metadata from train function
     // string as json
     std::ostringstream oss;
     std::string metadata = "{\"validation_metadata\": {\"num_examples\": 3000}}";
@@ -378,76 +445,142 @@ void GrpcClient::SendModelValidation(const std::string& modelID, json& metricDat
     ClientContext context;
     Response response;
     Status status = combinerStub_->SendModelValidation(&context, validation, &response);
-    std::cout << "SendModelValidation: " << validation.model_id() << std::endl;
+    std::cout << "sendModelValidation: " << validation.model_id() << std::endl;
 
     if (!status.ok()) {
-      std::cout << "SendModelValidation: failed for model: " << modelID << std::endl;
+      std::cout << "sendModelValidation: failed for model: " << modelID << std::endl;
       std::cout << status.error_code() << ": " << status.error_message()
                 << std::endl;
-      std::cout << "SendModelValidation: Response: " << response.response() << std::endl;
+      std::cout << "sendModelValidation: Response: " << response.response() << std::endl;
     }
     else {
-      std::cout << "SendModelValidation: Response: " << response.response() << std::endl;
+      std::cout << "sendModelValidation: Response: " << response.response() << std::endl;
     }
     // Garbage collect the client object.
     Client *clientCollect = validation.release_sender();
 }
 
-
-void GrpcClient::Validate(const std::string& inModelPath, const std::string& outMetricPath) {
+/**
+ * @brief (To override) Validates the model located at the specified input path and outputs the metrics to the specified output path.
+ * 
+ * This function serves as a placeholder for the model validation logic. It currently outputs a message indicating
+ * the model being validated.
+ * 
+ * This function should perform the following steps:
+ * 1. Load the model data from the specified input file path.
+ * 2. Calculate the validation metrics for the model.
+ * 3. Save the model validation metrics in JSON format to the specified output file path.
+ * 
+ * @param inModelPath The file path to the input model that needs to be validated.
+ * @param outMetricPath The file path where the validation metrics will be saved.
+ */
+void GrpcClient::validate(const std::string& inModelPath, const std::string& outMetricPath) {
     // Placeholder for model validation logic
     std::cout << "Validating model: " << inModelPath << std::endl;
 }
 
-void GrpcClient::ValidateGlobalModel(const std::string& modelID, TaskRequest& requestData) {
+/**
+ * @brief Validates the global model by downloading it, saving it to a file, validating it, and sending the validation response to the server.
+ * 
+ * This function performs the following steps:
+ * 1. Downloads the model from the server using the provided model ID.
+ * 2. Saves the downloaded model to a temporary file.
+ * 3. Validates the model and saves the validation metrics to a file.
+ * 4. Reads the validation metrics from the file.
+ * 5. Sends the model validation response to the server.
+ * 6. Deletes the temporary files (model and metrics) from the disk.
+ * 
+ * @param modelID The ID of the model to be validated.
+ * @param requestData The task request data to be sent along with the validation response via gRPC.
+ */
+void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& requestData) {
     std::cout << "Validating global model: " << modelID << std::endl;
 
     // Download model from server
     std::cout << "Downloading model: " << modelID << std::endl;
-    std::string modelData = GrpcClient::DownloadModel(modelID);
+    std::string modelData = GrpcClient::downloadModel(modelID);
 
     // Save model to file
     // TODO: model should be saved to a temporary file and chunks should be written to it
     std::cout << "Saving model to file: " << modelID << std::endl;
-    SaveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
+    saveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
 
     const std::string metricPath = std::string("./") + modelID + std::string(".json");
 
-    // Validate the model
-    this->Validate(std::string("./") + modelID + std::string(".bin"), metricPath);
+    // validate the model
+    this->validate(std::string("./") + modelID + std::string(".bin"), metricPath);
 
     // Read the metric file from disk
     std::cout << "Loading metric from file: " << metricPath << std::endl;
-    json metricData = LoadMetricsFromFile(metricPath);
+    json metricData = loadMetricsFromFile(metricPath);
 
     // Send model validation response to server
-    GrpcClient::SendModelValidation(modelID, metricData, requestData);
+    GrpcClient::sendModelValidation(modelID, metricData, requestData);
 
     // Delete metrics file from disk
-    DeleteFileFromDisk(metricPath);
+    deleteFileFromDisk(metricPath);
     // Delete model from disk
-    DeleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
+    deleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
 }
 
-void GrpcClient::SetName(const std::string& name) {
+/**
+ * @brief Sets the name for the GrpcClient.
+ * 
+ * This function assigns the provided name to the GrpcClient instance.
+ * 
+ * @param name The name to be set for the GrpcClient.
+ */
+void GrpcClient::setName(const std::string& name) {
     name_ = name;
 }
 
-void GrpcClient::SetId(const std::string& id) {
+/**
+ * @brief Sets the ID for the GrpcClient.
+ * 
+ * This function assigns the provided ID to the GrpcClient instance.
+ * 
+ * @param id The ID to be set for the GrpcClient.
+ */
+void GrpcClient::setId(const std::string& id) {
     id_ = id;
 }
 
-void GrpcClient::SetChunkSize(std::size_t chunkSize) {
+/**
+ * @brief Sets the chunk size for the gRPC client.
+ * 
+ * This method allows you to specify the size of the chunks that the gRPC client
+ * will use for data transmission.
+ * 
+ * @param chunkSize The size of the chunks in bytes.
+ */
+void GrpcClient::setChunkSize(std::size_t chunkSize) {
     this->chunkSize = chunkSize;
 }
 
-std::size_t GrpcClient::GetChunkSize() {
+/**
+ * @brief Retrieves the size of the chunk.
+ * 
+ * This function returns the size of the chunk that is used by the GrpcClient.
+ * 
+ * @return std::size_t The size of the chunk.
+ */
+std::size_t GrpcClient::getChunkSize() {
     return chunkSize;
 }
 
-void SendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
+/**
+ * @brief Continuously sends heartbeat signals to the server at specified intervals.
+ *
+ * This function runs an infinite loop that sends a heartbeat signal to the server
+ * using the provided GrpcClient instance. After sending each heartbeat, the function
+ * pauses for the specified interval before sending the next heartbeat.
+ *
+ * @param client A pointer to the GrpcClient instance used to send heartbeat signals.
+ * @param intervalSeconds The interval, in seconds, between consecutive heartbeat signals.
+ */
+void sendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
   while (true) {
-      client->HeartBeat();
+      client->heartBeat();
       std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
   }
 }

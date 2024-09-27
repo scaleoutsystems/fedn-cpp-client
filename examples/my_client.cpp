@@ -4,7 +4,7 @@ class CustomGrpcClient : public GrpcClient {
 public:
     CustomGrpcClient(std::shared_ptr<ChannelInterface> channel) : GrpcClient(channel) {}
 
-    void Train(const std::string& inModelPath, const std::string& outModelPath) override {
+    void train(const std::string& inModelPath, const std::string& outModelPath) override {
 
         // std::cout << "Dummy code: Updating local model with global model as seed!" << std::endl;
         // // Dummy code: update model with modelData
@@ -22,18 +22,18 @@ public:
         // loadedData.save(outModelPath, arma::raw_binary);
 
         // Using own code to load the matrix from a binary file, dymmy code. Remove if using Armadillo
-        std::string modelData = LoadModelFromFile(inModelPath);
+        std::string modelData = loadModelFromFile(inModelPath);
         
         // Send the same model back as update
         std::string modelUpdateData = modelData;
         std::cout << "USER-DEFINED CODE: Training model..." << std::endl;
         
         // Using own code to save the matrix as a binary file, dymmy code. Remove if using Armadillo
-        SaveModelToFile(modelUpdateData, outModelPath);
+        saveModelToFile(modelUpdateData, outModelPath);
     }
-    void Validate(const std::string& inModelPath, const std::string& outMetricPath) override {
+    void validate(const std::string& inModelPath, const std::string& outMetricPath) override {
 
-        std::string modelData = LoadModelFromFile(inModelPath);
+        std::string modelData = loadModelFromFile(inModelPath);
         std::cout << "USER-DEFINED CODE: Validating model..." << std::endl;
 
         // Dummy code: validate model, OBS json must be an object, arrays sush as {"acc":1,"loss":2} are not allowed.
@@ -41,7 +41,7 @@ public:
             {"accuracy", 0.95},
             {"loss", 0.05}
         };
-        SaveMetricsToFile(metrics, outMetricPath);
+        saveMetricsToFile(metrics, outMetricPath);
     }
 };
 

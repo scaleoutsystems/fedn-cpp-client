@@ -9,12 +9,12 @@
 
 using json = nlohmann::json;
 
-size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* output);
-void SaveModelToFile(const std::string& modelData, const std::string& modelPath);
-void SaveMetricsToFile(const json& metrics, const std::string& metricPath);
-std::string LoadModelFromFile(const std::string& modelPath);
-json LoadMetricsFromFile(const std::string& metricPath);
-void DeleteFileFromDisk(const std::string& path);
+size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* output);
+void saveModelToFile(const std::string& modelData, const std::string& modelPath);
+void saveMetricsToFile(const json& metrics, const std::string& metricPath);
+std::string loadModelFromFile(const std::string& modelPath);
+json loadMetricsFromFile(const std::string& metricPath);
+void deleteFileFromDisk(const std::string& path);
 std::string generateRandomUUID();
 std::map<std::string, std::string> readCombinerConfig(YAML::Node configFile);
 std::map<std::string, std::string> readControllerConfig(YAML::Node config);

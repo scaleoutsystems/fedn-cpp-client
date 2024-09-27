@@ -4,6 +4,17 @@
 #include "../include/fednlib/http.h"
 #include "../include/fednlib/utils.h"
 
+/**
+ * @brief Constructs a new HttpClient object.
+ * 
+ * Initializes the HttpClient with the specified API URL and optional token.
+ * Also initializes the libcurl library for HTTP requests.
+ * 
+ * @param apiUrl The base URL of the API to interact with.
+ * @param token (Optional) The authentication token for the API.
+ * 
+ * @throws std::runtime_error If libcurl initialization fails.
+ */
 HttpClient::HttpClient(const std::string& apiUrl, const std::string& token = "") : apiUrl(apiUrl), token(token) {
     curl = curl_easy_init();
     if (!curl) {
@@ -12,12 +23,31 @@ HttpClient::HttpClient(const std::string& apiUrl, const std::string& token = "")
     }
 }
 
+/**
+ * @brief Destructor for the HttpClient class.
+ *
+ * This destructor cleans up the CURL handle if it has been initialized.
+ * It ensures that any resources allocated by CURL are properly released.
+ */
 HttpClient::~HttpClient() {
     if (curl) {
         curl_easy_cleanup(curl);
     }
 }
 
+/**
+ * @brief Assigns a client to the controller using the provided configuration.
+ *
+ * This function sends a POST request to the /add_client endpoint of the API,
+ * with the client configuration provided in the controllerConfig map. The
+ * request body is formatted as JSON and includes the client_id, name, package,
+ * and preferred_combiner fields.
+ *
+ * @param controllerConfig A map containing the client configuration.
+ *
+ * @return A JSON object containing the response from the server. If an error occurs,
+ * an empty JSON object is returned.
+ */
 json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     // Get request body as JSON
     json requestData = {
@@ -36,7 +66,7 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     // Set libcurl options for the POST request
     curl_easy_setopt(curl, CURLOPT_URL, addClientApiUrl.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonData.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
     // allow all redirects
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
@@ -102,6 +132,13 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     }
 }
 
+/**
+ * @brief Retrieves the authentication token.
+ * 
+ * This method returns the current authentication token stored in the HttpClient instance.
+ * 
+ * @return std::string The authentication token.
+ */
 std::string HttpClient::getToken() {
     return token;
 }
