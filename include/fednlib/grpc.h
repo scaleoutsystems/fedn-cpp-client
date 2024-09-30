@@ -22,6 +22,7 @@ public:
     void heartBeat();
     void connectTaskStream();
     std::string downloadModel(const std::string& modelID);
+    void streamModelToFile(const std::string& modelID, const std::string& modelPath);
     void uploadModel(std::string& modelID, std::string& modelData);
     virtual void updateLocalModel(const std::string& modelID, const std::string& requestData);
     virtual void train(const std::string& inModelPath, const std::string& outModelPath);
