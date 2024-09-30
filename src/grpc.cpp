@@ -209,7 +209,7 @@ std::string GrpcClient::downloadModel(const std::string& modelID) {
  * @note The function assumes that the server sends the model data in chunks and
  *       that the status of the model response indicates the progress of the download.
  */
-void GrpcClient::streamModelToFile(const std::string& modelID, const std::string& modelPath) {
+void GrpcClient::downloadModelToFile(const std::string& modelID, const std::string& modelPath) {
     std::cout << "Buffering model " << modelID << "..." << std::endl;
 
     // request 
@@ -344,6 +344,89 @@ void GrpcClient::uploadModel(std::string& modelID, std::string& modelData) {
     }
 }
 
+void GrpcClient::uploadModelFromFile(const std::string& modelID, const std::string& modelPath) {
+    // Create an ifstream object and open the file in binary mode
+    std::ifstream inFile(modelPath, std::ios::binary);
+    // Check if the file was opened successfully
+    if (!inFile) {
+        std::cerr << "Error opening file " << modelPath << " for reading" << std::endl;
+        return;
+    }
+
+    // Get the length of the file
+    inFile.seekg(0, inFile.end);
+    size_t totalSize = inFile.tellg();
+    inFile.seekg(0, inFile.beg);
+
+    // response 
+    ModelResponse response;
+    // context
+    ClientContext context;
+
+    // Client
+    Client* client = new Client();
+    client->set_name(name_);
+    client->set_role(WORKER);
+    client->set_client_id(id_);
+
+    // Get ClientWriter from stream
+    std::unique_ptr<ClientWriter<ModelRequest> > writer(
+        modelserviceStub_->Upload(&context, &response));
+
+    // Calculate the number of chunks
+    size_t chunkSize = this->getChunkSize();
+    size_t offset = 0;
+
+    std::cout << "Upload in progress: " << modelID << std::endl;
+    std::cout << "Chunk size: " << chunkSize << " bytes" << std::endl;
+
+    while (offset < totalSize) {
+        ModelRequest request;
+        size_t currentChunkSize = std::min(chunkSize, totalSize - offset);
+        std::string buffer(currentChunkSize, '\0');
+        inFile.read(&buffer[0], currentChunkSize);
+        std::cout << "File pointer position: " << inFile.tellg() << std::endl;
+        request.set_data(buffer);
+        request.set_id(modelID);
+        request.set_status(ModelStatus::IN_PROGRESS);
+        // Pass ownership of client to protobuf message only for the first chunk
+        if (offset == 0) {
+            request.set_allocated_sender(client);
+        }
+
+        if (!writer->Write(request)) {
+            // Broken stream.
+            std::cout << "Upload failed for model: " << modelID << std::endl;
+            std::cout << "Disconnecting from UploadStream" << std::endl;
+            grpc::Status status = writer->Finish();
+            inFile.close();
+            return;
+        }
+        std::cout << "Uploading chunk: " << offset << " - " << offset + currentChunkSize << std::endl;
+        offset += currentChunkSize;
+    }
+
+    // Finish writing to stream with final message
+    ModelRequest requestFinal;
+    requestFinal.set_id(modelID);
+    requestFinal.set_status(ModelStatus::OK);
+    writer->Write(requestFinal);
+    writer->WritesDone();
+    grpc::Status status = writer->Finish();
+    inFile.close();
+
+    if (status.ok()) {
+        std::cout << "Upload complete for local model: " << modelID << std::endl;
+        // Print message from response
+        std::cout << "Response: " << response.message() << std::endl;
+    } else {
+        std::cout << "Upload failed for model: " << modelID << std::endl;
+        std::cout << status.error_code() << ": " << status.error_message() << std::endl;
+        // Print message from response
+        std::cout << "Response: " << response.message() << std::endl;
+    }
+}
+
 /**
  * @brief (To override) Trains the model by loading it from a file, processing it, and saving the updated model to another file.
  * 
@@ -386,7 +469,7 @@ void GrpcClient::updateLocalModel(const std::string& modelID, const std::string&
     std::cout << "Updating local model: " << modelID << std::endl;
 
     // Stream model and write it to file
-    streamModelToFile(modelID, std::string("./") + modelID + std::string(".bin"));
+    downloadModelToFile(modelID, std::string("./") + modelID + std::string(".bin"));
 
     // Create random UUID4 for model update
     std::string modelUpdateID = generateRandomUUID();
@@ -395,12 +478,8 @@ void GrpcClient::updateLocalModel(const std::string& modelID, const std::string&
     // train the model
     this->train(std::string("./") + modelID + std::string(".bin"), std::string("./") + modelUpdateID + std::string(".bin"));
 
-    // Read the binary string from the file
-    std::cout << "Loading model from file: " << modelUpdateID << std::endl;
-    std::string data = loadModelFromFile(std::string("./") + modelUpdateID + std::string(".bin"));
-
-    // Upload model to server
-    GrpcClient::uploadModel(modelUpdateID, data);
+    std::cout << "Streaming model from file: " << modelUpdateID << std::endl;
+    GrpcClient::uploadModelFromFile(modelUpdateID, std::string("./") + modelUpdateID + std::string(".bin"));
 
     // Send model update response to server
     GrpcClient::sendModelUpdate(modelID, modelUpdateID, requestData);
@@ -565,7 +644,7 @@ void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& re
     std::cout << "Validating global model: " << modelID << std::endl;
 
     // Stream model and write it to file
-    streamModelToFile(modelID, std::string("./") + modelID + std::string(".bin"));
+    downloadModelToFile(modelID, std::string("./") + modelID + std::string(".bin"));
 
     const std::string metricPath = std::string("./") + modelID + std::string(".json");
 
