@@ -404,6 +404,16 @@ void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& re
     deleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
 }
 
+/**
+ * @brief (To override) Performs model inference using the specified model and saves the results to the given output path.
+ *
+ * This function loads a model from the provided file path, performs inference, and saves the prediction results
+ * to the specified output file. The inference process is currently mocked with placeholder data and should be overridden
+ * by the user of this library API.
+ *
+ * @param modelPath The file path to the model to be used for inference.
+ * @param outputPath The file path where the inference results will be saved.
+ */
 void GrpcClient::predict(const std::string& modelPath, const std::string& outputPath) {
     // Placeholder for model inference logic
     std::cout << "Performing model inference on model: " << modelPath << std::endl;
@@ -420,6 +430,17 @@ void GrpcClient::predict(const std::string& modelPath, const std::string& output
     saveMetricsToFile(predictionData, outputPath);
 }
 
+/**
+ * @brief Performs inference using a global model identified by modelID.
+ *
+ * This function downloads a model from the server, saves it to a file, performs
+ * inference using the model, reads the inference data from a file, and sends the
+ * inference results back to the server. Finally, it cleans up by deleting the
+ * model and output files from disk.
+ *
+ * @param modelID The identifier of the model to be used for inference.
+ * @param requestData The task request data to be sent along with the inference results.
+ */
 void GrpcClient::inferGlobalModel(const std::string& modelID, TaskRequest& requestData) {
     // File paths for model and inference data
     const std::string modelPath = std::string("./") + modelID + std::string(".bin");
