@@ -27,8 +27,10 @@ public:
     virtual void train(const std::string& inModelPath, const std::string& outModelPath);
     void validateGlobalModel(const std::string& modelID, TaskRequest& requestData);
     virtual void validate(const std::string& inModelPath, const std::string& outMetricPath);
+    virtual void predict(const std::string& modelPath, const std::string& outputPath);
+    void inferGlobalModel(const std::string& modelID, TaskRequest& requestData);
     void sendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config);
-    void sendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData);
+    void sendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData, bool isInference);
     void setName(const std::string& name);
     void setId(const std::string& id);
     void setChunkSize(std::size_t chunkSize);

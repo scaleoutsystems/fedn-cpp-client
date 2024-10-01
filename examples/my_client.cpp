@@ -22,19 +22,19 @@ public:
         // loadedData.save(outModelPath, arma::raw_binary);
 
         // Using own code to load the matrix from a binary file, dymmy code. Remove if using Armadillo
+        std::cout << "USER-DEFINED CODE: Training model..." << std::endl;
         std::string modelData = loadModelFromFile(inModelPath);
         
         // Send the same model back as update
         std::string modelUpdateData = modelData;
-        std::cout << "USER-DEFINED CODE: Training model..." << std::endl;
         
         // Using own code to save the matrix as a binary file, dymmy code. Remove if using Armadillo
         saveModelToFile(modelUpdateData, outModelPath);
     }
     void validate(const std::string& inModelPath, const std::string& outMetricPath) override {
+        std::cout << "USER-DEFINED CODE: Validating model..." << std::endl;
 
         std::string modelData = loadModelFromFile(inModelPath);
-        std::cout << "USER-DEFINED CODE: Validating model..." << std::endl;
 
         // Dummy code: validate model, OBS json must be an object, arrays sush as {"acc":1,"loss":2} are not allowed.
         json metrics = {
@@ -42,6 +42,20 @@ public:
             {"loss", 0.05}
         };
         saveMetricsToFile(metrics, outMetricPath);
+    }
+    void predict(const std::string& modelPath, const std::string& outputPath) override {
+        std::cout << "USER-DEFINED CODE: Performing model inference..." << std::endl;
+
+        std::string modelData = loadModelFromFile(modelPath);
+
+        // Mock model inference data classificaion
+        json predictionData = {
+            {"prediction", 1},
+            {"confidence", 0.95}
+        };
+
+        // Save inference data to file
+        saveMetricsToFile(predictionData, outputPath);
     }
 };
 

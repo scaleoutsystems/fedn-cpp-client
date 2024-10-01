@@ -130,8 +130,7 @@ void GrpcClient::connectTaskStream() {
         this->validateGlobalModel(task.model_id(), task);
       }
       else if (task.type() == StatusType::INFERENCE) {
-        // TODO: Implement model inference
-        std::cout << "Model inference not implemented, skipping..." << std::endl;
+        this->inferGlobalModel(task.model_id(), task);
       }
       
     }
@@ -343,6 +342,113 @@ void GrpcClient::updateLocalModel(const std::string& modelID, const std::string&
 }
 
 /**
+ * @brief (To override) Validates the model located at the specified input path and outputs the metrics to the specified output path.
+ * 
+ * This function serves as a placeholder for the model validation logic. It currently outputs a message indicating
+ * the model being validated.
+ * 
+ * This function should perform the following steps:
+ * 1. Load the model data from the specified input file path.
+ * 2. Calculate the validation metrics for the model.
+ * 3. Save the model validation metrics in JSON format to the specified output file path.
+ * 
+ * @param inModelPath The file path to the input model that needs to be validated.
+ * @param outMetricPath The file path where the validation metrics will be saved.
+ */
+void GrpcClient::validate(const std::string& inModelPath, const std::string& outMetricPath) {
+    // Placeholder for model validation logic
+    std::cout << "Validating model: " << inModelPath << std::endl;
+}
+
+/**
+ * @brief Validates the global model by downloading it, saving it to a file, validating it, and sending the validation response to the server.
+ * 
+ * This function performs the following steps:
+ * 1. Downloads the model from the server using the provided model ID.
+ * 2. Saves the downloaded model to a temporary file.
+ * 3. Validates the model and saves the validation metrics to a file.
+ * 4. Reads the validation metrics from the file.
+ * 5. Sends the model validation response to the server.
+ * 6. Deletes the temporary files (model and metrics) from the disk.
+ * 
+ * @param modelID The ID of the model to be validated.
+ * @param requestData The task request data to be sent along with the validation response via gRPC.
+ */
+void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& requestData) {
+    std::cout << "Validating global model: " << modelID << std::endl;
+
+    // Download model from server
+    std::cout << "Downloading model: " << modelID << std::endl;
+    std::string modelData = GrpcClient::downloadModel(modelID);
+
+    // Save model to file
+    // TODO: model should be saved to a temporary file and chunks should be written to it
+    std::cout << "Saving model to file: " << modelID << std::endl;
+    saveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
+
+    const std::string metricPath = std::string("./") + modelID + std::string(".json");
+
+    // validate the model
+    this->validate(std::string("./") + modelID + std::string(".bin"), metricPath);
+
+    // Read the metric file from disk
+    std::cout << "Loading metric from file: " << metricPath << std::endl;
+    json metricData = loadMetricsFromFile(metricPath);
+
+    // Send model validation response to server
+    GrpcClient::sendModelValidation(modelID, metricData, requestData, false);
+
+    // Delete metrics file from disk
+    deleteFileFromDisk(metricPath);
+    // Delete model from disk
+    deleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
+}
+
+void GrpcClient::predict(const std::string& modelPath, const std::string& outputPath) {
+    // Placeholder for model inference logic
+    std::cout << "Performing model inference on model: " << modelPath << std::endl;
+
+    std::string modelData = loadModelFromFile(modelPath);
+
+    // Mock model inference data classificaion
+    json predictionData = {
+        {"prediction", 1},
+        {"confidence", 0.95}
+    };
+
+    // Save inference data to file
+    saveMetricsToFile(predictionData, outputPath);
+}
+
+void GrpcClient::inferGlobalModel(const std::string& modelID, TaskRequest& requestData) {
+    // File paths for model and inference data
+    const std::string modelPath = std::string("./") + modelID + std::string(".bin");
+    const std::string predictionPath = std::string("./") + modelID + std::string("-out.json");
+
+    // Download model from server
+    std::cout << "Downloading model: " << modelID << std::endl;
+    std::string modelData = GrpcClient::downloadModel(modelID);
+
+    // Save model to file
+    std::cout << "Saving model to file: " << modelID << std::endl;
+    saveModelToFile(modelData, modelPath);
+
+    // Perform model inference
+    this->predict(modelPath, predictionPath);
+
+    // Read the inference data from the file
+    std::cout << "Loading inference data from file: " << modelID << std::endl;
+    json predictionData = loadMetricsFromFile(predictionPath);
+
+    // Send model inference response to server
+    GrpcClient::sendModelValidation(modelID, predictionData, requestData, true);
+
+    // Delete model and output from disk
+    deleteFileFromDisk(modelPath);
+    deleteFileFromDisk(predictionPath);
+}
+
+/**
  * @brief Sends a model update to the server.
  * 
  * This function constructs a model update message and sends it to the server using gRPC.
@@ -354,7 +460,7 @@ void GrpcClient::updateLocalModel(const std::string& modelID, const std::string&
  * @param config The configuration string for the model update.
  */
 void GrpcClient::sendModelUpdate(const std::string& modelID, std::string& modelUpdateID, const std::string& config) {
-   // Send model update response to server
+    // Send model update response to server
     Client client;
     client.set_name(name_);
     client.set_role(WORKER);
@@ -412,7 +518,7 @@ void GrpcClient::sendModelUpdate(const std::string& modelID, std::string& modelU
  * @param metricData A JSON object containing the metric data for the model validation.
  * @param requestData A TaskRequest object containing the session ID and other request data.
  */
-void GrpcClient::sendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData) {
+void GrpcClient::sendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData, bool isInference) {
     // Send model validation response to server
     Client client;
     client.set_name(name_);
@@ -458,69 +564,6 @@ void GrpcClient::sendModelValidation(const std::string& modelID, json& metricDat
     }
     // Garbage collect the client object.
     Client *clientCollect = validation.release_sender();
-}
-
-/**
- * @brief (To override) Validates the model located at the specified input path and outputs the metrics to the specified output path.
- * 
- * This function serves as a placeholder for the model validation logic. It currently outputs a message indicating
- * the model being validated.
- * 
- * This function should perform the following steps:
- * 1. Load the model data from the specified input file path.
- * 2. Calculate the validation metrics for the model.
- * 3. Save the model validation metrics in JSON format to the specified output file path.
- * 
- * @param inModelPath The file path to the input model that needs to be validated.
- * @param outMetricPath The file path where the validation metrics will be saved.
- */
-void GrpcClient::validate(const std::string& inModelPath, const std::string& outMetricPath) {
-    // Placeholder for model validation logic
-    std::cout << "Validating model: " << inModelPath << std::endl;
-}
-
-/**
- * @brief Validates the global model by downloading it, saving it to a file, validating it, and sending the validation response to the server.
- * 
- * This function performs the following steps:
- * 1. Downloads the model from the server using the provided model ID.
- * 2. Saves the downloaded model to a temporary file.
- * 3. Validates the model and saves the validation metrics to a file.
- * 4. Reads the validation metrics from the file.
- * 5. Sends the model validation response to the server.
- * 6. Deletes the temporary files (model and metrics) from the disk.
- * 
- * @param modelID The ID of the model to be validated.
- * @param requestData The task request data to be sent along with the validation response via gRPC.
- */
-void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& requestData) {
-    std::cout << "Validating global model: " << modelID << std::endl;
-
-    // Download model from server
-    std::cout << "Downloading model: " << modelID << std::endl;
-    std::string modelData = GrpcClient::downloadModel(modelID);
-
-    // Save model to file
-    // TODO: model should be saved to a temporary file and chunks should be written to it
-    std::cout << "Saving model to file: " << modelID << std::endl;
-    saveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
-
-    const std::string metricPath = std::string("./") + modelID + std::string(".json");
-
-    // validate the model
-    this->validate(std::string("./") + modelID + std::string(".bin"), metricPath);
-
-    // Read the metric file from disk
-    std::cout << "Loading metric from file: " << metricPath << std::endl;
-    json metricData = loadMetricsFromFile(metricPath);
-
-    // Send model validation response to server
-    GrpcClient::sendModelValidation(modelID, metricData, requestData);
-
-    // Delete metrics file from disk
-    deleteFileFromDisk(metricPath);
-    // Delete model from disk
-    deleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
 }
 
 /**
