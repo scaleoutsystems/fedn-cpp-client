@@ -396,7 +396,7 @@ void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& re
     json metricData = loadMetricsFromFile(metricPath);
 
     // Send model validation response to server
-    GrpcClient::sendModelValidation(modelID, metricData, requestData, false);
+    GrpcClient::sendModelValidation(modelID, metricData, requestData);
 
     // Delete metrics file from disk
     deleteFileFromDisk(metricPath);
@@ -462,7 +462,7 @@ void GrpcClient::inferGlobalModel(const std::string& modelID, TaskRequest& reque
     json predictionData = loadMetricsFromFile(predictionPath);
 
     // Send model inference response to server
-    GrpcClient::sendModelValidation(modelID, predictionData, requestData, true);
+    GrpcClient::sendModelInference(modelID, predictionData, requestData);
 
     // Delete model and output from disk
     deleteFileFromDisk(modelPath);
@@ -539,7 +539,7 @@ void GrpcClient::sendModelUpdate(const std::string& modelID, std::string& modelU
  * @param metricData A JSON object containing the metric data for the model validation.
  * @param requestData A TaskRequest object containing the session ID and other request data.
  */
-void GrpcClient::sendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData, bool isInference) {
+void GrpcClient::sendModelValidation(const std::string& modelID, json& metricData, TaskRequest& requestData) {
     // Send model validation response to server
     Client client;
     client.set_name(name_);
@@ -585,6 +585,63 @@ void GrpcClient::sendModelValidation(const std::string& modelID, json& metricDat
     }
     // Garbage collect the client object.
     Client *clientCollect = validation.release_sender();
+}
+
+/**
+ * @brief Sends a model inference response to the server.
+ *
+ * This function constructs a `ModelInference` message with the provided model ID,
+ * inference data, and request data, and sends it to the server using gRPC.
+ *
+ * @param modelID The ID of the model for which the inference is being sent.
+ * @param inferenceData The inference data in JSON format.
+ * @param requestData The task request data containing session information.
+ */
+void GrpcClient::sendModelInference(const std::string& modelID, json& inferenceData, TaskRequest& requestData) {
+    // Send model inference response to server
+    Client client;
+    client.set_name(name_);
+    client.set_role(WORKER);
+    client.set_client_id(id_);
+
+    ModelInference inference;
+    inference.set_allocated_sender(&client);
+    inference.set_model_id(modelID);
+    inference.set_data(inferenceData.dump());
+    inference.set_inference_id(requestData.session_id());
+
+    // string as json
+    std::ostringstream oss;
+    std::string metadata = "{\"inference_metadata\": {\"num_examples\": 3000}}";
+    inference.set_meta(metadata);
+    
+    // get current date and time
+    google::protobuf::Timestamp* timestamp = inference.mutable_timestamp();
+    // Get the current time
+    auto now = std::chrono::system_clock::now();
+    // Convert to time_t
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    // Convert to Timestamp
+    timestamp->set_seconds(now_c);
+    timestamp->set_nanos(0);
+
+    // The actual RPC.
+    ClientContext context;
+    Response response;
+    Status status = combinerStub_->SendModelInference(&context, inference, &response);
+    std::cout << "sendModelInference: " << inference.model_id() << std::endl;
+
+    if (!status.ok()) {
+      std::cout << "sendModelInference: failed for model: " << modelID << std::endl;
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "sendModelInference: Response: " << response.response() << std::endl;
+    }
+    else {
+      std::cout << "sendModelInference: Response: " << response.response() << std::endl;
+    }
+    // Garbage collect the client object.
+    Client *clientCollect = inference.release_sender();
 }
 
 /**
