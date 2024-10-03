@@ -17,6 +17,7 @@ using grpc::ClientWriter;
 using fedn::Heartbeat;
 using fedn::ModelUpdate;
 using fedn::ModelValidation;
+using fedn::ModelInference;
 using fedn::ModelResponse;
 using fedn::ModelRequest;
 using fedn::ModelStatus;
