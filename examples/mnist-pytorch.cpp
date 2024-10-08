@@ -147,26 +147,20 @@ public:
         // Net model = armadilloToTorch(loadedData);
         
         Net model;
-        loadParameters(model, inModelPath);
+        // loadParameters(model, inModelPath);
 
         // Set the hyperparameters
-        const int num_epochs = 1;
+        const int num_epochs = 20;
         const int batch_size = 32;
         const double learning_rate = 0.001;
-
-        std::cout << "Loading MNIST training set..." << std::endl;
 
         // Load the MNIST dataset
         auto train_dataset = torch::data::datasets::MNIST("../mnist")
                                 .map(torch::data::transforms::Normalize<>(0.1307, 0.3081))
                                 .map(torch::data::transforms::Stack<>());
 
-        std::cout << "Creating train loader..." << std::endl;
-
         auto train_loader = torch::data::make_data_loader<torch::data::samplers::RandomSampler>(
             std::move(train_dataset), batch_size);
-
-        std::cout << "Moving to GPU if available..." << std::endl;
 
         // Set the model to the device
         torch::Device device(torch::cuda::is_available() ? torch::kCUDA : torch::kCPU);
@@ -175,7 +169,7 @@ public:
         // Define optimizer
         torch::optim::SGD optimizer(model.parameters(), torch::optim::SGDOptions(learning_rate));
 
-        std::cout << "Starting training loop..." << std::endl;
+        namespace F = torch::nn::functional;
 
         // Training loop
         for (int epoch = 1; epoch <= num_epochs; ++epoch) {
@@ -184,12 +178,9 @@ public:
                 auto data = batch.data.to(device);
                 auto target = batch.target.to(device);
 
-                // std::cout << "Data type of data: " << typeid(data).name() << std::endl;
-                // std::cout << "Data type of target: " << typeid(target).name() << std::endl;
-
                 optimizer.zero_grad();
                 auto output = model.forward(data);
-                auto loss = torch::nll_loss(output, target);
+                auto loss = F::nll_loss(output, target);
                 loss.backward();
                 optimizer.step();
 
