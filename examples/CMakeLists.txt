@@ -47,9 +47,11 @@ endif()
 
 # If using Armadillo
 # Ensure that Armadillo is installed on the system
-#set(ARMADILLO_LIBRARY "~/.local/lib/cmake/lib/libarmadillo.so")
-#set(ARMADILLO_INCLUDE_DIR "~/.local/lib/cmake/include")
-#set(ARMADILLO_INCLUDE_DIRS "/usr/include")
+set(ARMADILLO_LIBRARY "<path-to-armadillo>")
+set(ARMADILLO_INCLUDE_DIR "<path-to-armadillo-include-dir>")
+set(ARMADILLO_INCLUDE_DIRS "<path-to-armadillo-include-dirs>")
+
+link_directories(/opt/homebrew/opt/armadillo/lib)
 
 # Proto file for project
 get_filename_component(fedn_proto "../src/protos/fedn.proto" ABSOLUTE)
@@ -98,11 +100,34 @@ include_directories(${CMAKE_SOURCE_DIR}/../include)  # Point to the headers in t
 # Specify the directory where the built fednlib library is located
 link_directories(${FEDNLIB_DIR})  # Add the directory where libfednlib.a resides
 
+# Include the directory where cnpy.h is located
+include_directories("../../cnpy")
+
+# Set the C++ standard to C++17, which is required by LibTorch
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Set the path to the directory where LibTorch was unzipped
+set(CMAKE_PREFIX_PATH "../../Documents/libtorch")
+
+# Find LibTorch (PyTorch C++ API)
+find_package(Torch REQUIRED)
+
+# Include LibTorch headers
+include_directories(${TORCH_INCLUDE_DIRS})
+
+set(CMAKE_BUILD_RPATH "<path-to-libtorch>")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I/opt/homebrew/opt/libomp/include")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/homebrew/opt/libomp/lib")
+
+find_package(Armadillo REQUIRED)
+
 # Add my_client as an executable
-add_executable(my_client "my_client.cpp")
+add_executable(mnist-pytorch "mnist-pytorch.cpp")
 
 # Link the executable with libraries
-target_link_libraries(my_client
+target_link_libraries(mnist-pytorch
   fednlib
   fedn_grpc_proto
   yaml-cpp
@@ -111,7 +136,13 @@ target_link_libraries(my_client
   ${_REFLECTION}
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF}
+  ${TORCH_LIBRARIES} 
+  # ../../cnpy/build/libcnpy.a
+  <path-to-libtorch-a>
+  armadillo
 )
 
 # Set the include directories for the example
 include_directories(${CMAKE_SOURCE_DIR}/include)
+
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl")#,-rpath ${TORCH_INSTALL_PREFIX}/lib")
