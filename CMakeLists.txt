@@ -102,23 +102,29 @@ set(SOURCES
 # Add fednlib as a library
 add_library(fednlib STATIC ${SOURCES})
 
+# Create an alias target
+add_library(fednlib::fednlib ALIAS fednlib)
+
 # Link the fednlib with libraries
-target_link_libraries(fednlib PRIVATE 
-fedn_grpc_proto 
-absl::flags 
-absl::flags_parse 
-${_REFLECTION} 
-${_GRPC_GRPCPP} 
-${_PROTOBUF_LIBPROTOBUF} 
-CURL::libcurl 
-yaml-cpp 
-${YAML_CPP_LIBRARIES} 
-nlohmann_json::nlohmann_json
+target_link_libraries(fednlib PUBLIC 
+  fedn_grpc_proto 
+  absl::flags 
+  absl::flags_parse 
+  ${_REFLECTION} 
+  ${_GRPC_GRPCPP} 
+  ${_PROTOBUF_LIBPROTOBUF} 
+  CURL::libcurl 
+  yaml-cpp 
+  ${YAML_CPP_LIBRARIES} 
+  nlohmann_json::nlohmann_json
 )
 
 if(DEFINED ${ARMADILLO_LIBRARY})
 target_link_libraries(fednlib PRIVATE ${ARMADILLO_LIBRARY})
 endif()
+
+# Link header files to fednlib
+target_include_directories(fednlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Include directories
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
