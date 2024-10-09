@@ -17,7 +17,7 @@ using grpc::ClientWriter;
 using fedn::Heartbeat;
 using fedn::ModelUpdate;
 using fedn::ModelValidation;
-using fedn::ModelInference;
+using fedn::ModelPrediction;
 using fedn::ModelResponse;
 using fedn::ModelRequest;
 using fedn::ModelStatus;
@@ -94,10 +94,10 @@ void GrpcClient::heartBeat() {
  * This function sets up a gRPC client, sends a ClientAvailableMessage to the server,
  * and listens for TaskRequest messages from the combiner. Depending on the type of 
  * TaskRequest received, it performs different actions such as updating the local model,
- * validating the global model, or handling model inference.
+ * validating the global model, or handling model prediction.
  * 
  * @note The function currently only handles MODEL_UPDATE and MODEL_VALIDATION task types.
- *       Model inference is not yet implemented.
+ *       Model prediction is not yet implemented.
  */
 void GrpcClient::connectTaskStream() {
     // Data we are sending to the server.
@@ -131,7 +131,7 @@ void GrpcClient::connectTaskStream() {
         this->validateGlobalModel(task.model_id(), task);
       }
       else if (task.type() == StatusType::INFERENCE) {
-        this->inferGlobalModel(task.model_id(), task);
+        this->predictGlobalModel(task.model_id(), task);
       }
       
     }
@@ -406,44 +406,44 @@ void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& re
 }
 
 /**
- * @brief (To override) Performs model inference using the specified model and saves the results to the given output path.
+ * @brief (To override) Performs model prediction using the specified model and saves the results to the given output path.
  *
- * This function loads a model from the provided file path, performs inference, and saves the prediction results
- * to the specified output file. The inference process is currently mocked with placeholder data and should be overridden
+ * This function loads a model from the provided file path, performs prediction, and saves the prediction results
+ * to the specified output file. The prediction process is currently mocked with placeholder data and should be overridden
  * by the user of this library API.
  *
- * @param modelPath The file path to the model to be used for inference.
- * @param outputPath The file path where the inference results will be saved.
+ * @param modelPath The file path to the model to be used for prediction.
+ * @param outputPath The file path where the prediction results will be saved.
  */
 void GrpcClient::predict(const std::string& modelPath, const std::string& outputPath) {
-    // Placeholder for model inference logic
-    std::cout << "Performing model inference on model: " << modelPath << std::endl;
+    // Placeholder for model prediction logic
+    std::cout << "Performing model prediction on model: " << modelPath << std::endl;
 
     std::string modelData = loadModelFromFile(modelPath);
 
-    // Mock model inference data classificaion
+    // Mock model prediction data classificaion
     json predictionData = {
         {"prediction", 1},
         {"confidence", 0.95}
     };
 
-    // Save inference data to file
+    // Save prediction data to file
     saveMetricsToFile(predictionData, outputPath);
 }
 
 /**
- * @brief Performs inference using a global model identified by modelID.
+ * @brief Performs prediction using a global model identified by modelID.
  *
  * This function downloads a model from the server, saves it to a file, performs
- * inference using the model, reads the inference data from a file, and sends the
- * inference results back to the server. Finally, it cleans up by deleting the
+ * prediction using the model, reads the prediction data from a file, and sends the
+ * prediction results back to the server. Finally, it cleans up by deleting the
  * model and output files from disk.
  *
- * @param modelID The identifier of the model to be used for inference.
- * @param requestData The task request data to be sent along with the inference results.
+ * @param modelID The identifier of the model to be used for prediction.
+ * @param requestData The task request data to be sent along with the prediction results.
  */
-void GrpcClient::inferGlobalModel(const std::string& modelID, TaskRequest& requestData) {
-    // File paths for model and inference data
+void GrpcClient::predictGlobalModel(const std::string& modelID, TaskRequest& requestData) {
+    // File paths for model and prediction data
     const std::string modelPath = std::string("./") + modelID + std::string(".bin");
     const std::string predictionPath = std::string("./") + modelID + std::string("-out.json");
 
@@ -455,15 +455,15 @@ void GrpcClient::inferGlobalModel(const std::string& modelID, TaskRequest& reque
     std::cout << "Saving model to file: " << modelID << std::endl;
     saveModelToFile(modelData, modelPath);
 
-    // Perform model inference
+    // Perform model prediction
     this->predict(modelPath, predictionPath);
 
-    // Read the inference data from the file
-    std::cout << "Loading inference data from file: " << modelID << std::endl;
+    // Read the prediction data from the file
+    std::cout << "Loading prediction data from file: " << modelID << std::endl;
     json predictionData = loadMetricsFromFile(predictionPath);
 
-    // Send model inference response to server
-    GrpcClient::sendModelInference(modelID, predictionData, requestData);
+    // Send model prediction response to server
+    GrpcClient::sendModelPrediction(modelID, predictionData, requestData);
 
     // Delete model and output from disk
     deleteFileFromDisk(modelPath);
@@ -589,35 +589,35 @@ void GrpcClient::sendModelValidation(const std::string& modelID, json& metricDat
 }
 
 /**
- * @brief Sends a model inference response to the server.
+ * @brief Sends a model prediction response to the server.
  *
- * This function constructs a `ModelInference` message with the provided model ID,
- * inference data, and request data, and sends it to the server using gRPC.
+ * This function constructs a `ModelPrediction` message with the provided model ID,
+ * prediction data, and request data, and sends it to the server using gRPC.
  *
- * @param modelID The ID of the model for which the inference is being sent.
- * @param inferenceData The inference data in JSON format.
+ * @param modelID The ID of the model for which the prediction is being sent.
+ * @param predictionData The prediction data in JSON format.
  * @param requestData The task request data containing session information.
  */
-void GrpcClient::sendModelInference(const std::string& modelID, json& inferenceData, TaskRequest& requestData) {
-    // Send model inference response to server
+void GrpcClient::sendModelPrediction(const std::string& modelID, json& predictionData, TaskRequest& requestData) {
+    // Send model prediction response to server
     Client client;
     client.set_name(name_);
     client.set_role(WORKER);
     client.set_client_id(id_);
 
-    ModelInference inference;
-    inference.set_allocated_sender(&client);
-    inference.set_model_id(modelID);
-    inference.set_data(inferenceData.dump());
-    inference.set_inference_id(requestData.session_id());
+    ModelPrediction prediction;
+    prediction.set_allocated_sender(&client);
+    prediction.set_model_id(modelID);
+    prediction.set_data(predictionData.dump());
+    prediction.set_prediction_id(requestData.session_id());
 
     // string as json
     std::ostringstream oss;
-    std::string metadata = "{\"inference_metadata\": {\"num_examples\": 3000}}";
-    inference.set_meta(metadata);
+    std::string metadata = "{\"prediction_metadata\": {\"num_examples\": 3000}}";
+    prediction.set_meta(metadata);
     
     // get current date and time
-    google::protobuf::Timestamp* timestamp = inference.mutable_timestamp();
+    google::protobuf::Timestamp* timestamp = prediction.mutable_timestamp();
     // Get the current time
     auto now = std::chrono::system_clock::now();
     // Convert to time_t
@@ -629,20 +629,20 @@ void GrpcClient::sendModelInference(const std::string& modelID, json& inferenceD
     // The actual RPC.
     ClientContext context;
     Response response;
-    Status status = combinerStub_->SendModelInference(&context, inference, &response);
-    std::cout << "sendModelInference: " << inference.model_id() << std::endl;
+    Status status = combinerStub_->SendModelPrediction(&context, prediction, &response);
+    std::cout << "sendModelPrediction: " << prediction.model_id() << std::endl;
 
     if (!status.ok()) {
-      std::cout << "sendModelInference: failed for model: " << modelID << std::endl;
+      std::cout << "sendModelPrediction: failed for model: " << modelID << std::endl;
       std::cout << status.error_code() << ": " << status.error_message()
                 << std::endl;
-      std::cout << "sendModelInference: Response: " << response.response() << std::endl;
+      std::cout << "sendModelPrediction: Response: " << response.response() << std::endl;
     }
     else {
-      std::cout << "sendModelInference: Response: " << response.response() << std::endl;
+      std::cout << "sendModelPrediction: Response: " << response.response() << std::endl;
     }
     // Garbage collect the client object.
-    Client *clientCollect = inference.release_sender();
+    Client *clientCollect = prediction.release_sender();
 }
 
 /**

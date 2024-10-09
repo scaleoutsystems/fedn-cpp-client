@@ -44,17 +44,17 @@ public:
         saveMetricsToFile(metrics, outMetricPath);
     }
     void predict(const std::string& modelPath, const std::string& outputPath) override {
-        std::cout << "USER-DEFINED CODE: Performing model inference..." << std::endl;
+        std::cout << "USER-DEFINED CODE: Performing model prediction..." << std::endl;
 
         std::string modelData = loadModelFromFile(modelPath);
 
-        // Mock model inference data classificaion
+        // Mock model prediction data classificaion
         json predictionData = {
             {"prediction", 1},
             {"confidence", 0.95}
         };
 
-        // Save inference data to file
+        // Save prediction data to file
         saveMetricsToFile(predictionData, outputPath);
     }
 };
