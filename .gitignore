@@ -34,6 +34,3 @@
 # Build folders
 _build
 build
-
-# MNIST data files
-mnist

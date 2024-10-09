@@ -4,10 +4,10 @@ A FEDn client in C++.
 **Note:** This is a prototype and is still in active development so the interface might change frequently! The purpose of this prototype is to demonstrate how the C++ client can be used to connect to the federated network. In the example below, there is no actual model training being performed on the client.
 
 ## fednlib API
-To create a FEDn client in C++, the user creates a C++ source file where they implement their machine learning code and use the FEDn library API `fednlib` to connect the client to the federated network. The file `my_client.cpp` in the `examples` folder shows how the user implements their own machine learning code by overriding the methods `train`and `validate` of the `GrpcClient` class, and connect the client to the network in the `main` function.
+To create a FEDn client in C++, the user creates a C++ source file where they implement their machine learning code and use the FEDn library API `fednlib` to connect the client to the federated network. The file `my-client.cpp` in the `examples` folder shows how the user implements their own machine learning code by overriding the methods `train`and `validate` of the `GrpcClient` class, and connect the client to the network in the `main` function.
 
-* `train`: The user starts by reading the model from a binary file into the preferred format (depending on the ML library that is used), implements the machine learning logic, and saves the updated model back to a file in binary format. In the example `my_client.cpp`, this function simply reads the global model into memory and writes it back to file.
-* `validate`: The user starts by reading the model from a binary file, computes the preferred validation metrics, saves the metrics in a JSON object and writes the JSON to file. In the example `my_client.cpp`, this function creates a JSON with mock validation data and writes it to file.
+* `train`: The user starts by reading the model from a binary file into the preferred format (depending on the ML library that is used), implements the machine learning logic, and saves the updated model back to a file in binary format. In the example `my-client.cpp`, this function simply reads the global model into memory and writes it back to file.
+* `validate`: The user starts by reading the model from a binary file, computes the preferred validation metrics, saves the metrics in a JSON object and writes the JSON to file. In the example `my-client.cpp`, this function creates a JSON with mock validation data and writes it to file.
 * `main`: The user starts by creating an object of the class `FednClient`, passing the client configuration file path to the constructor. Then the user gets the combiner configuration from the `FednClient` object and uses it to setup a gRPC channel. Then the user creates an object of the custom class which inherits from `GrpcCient` and overrides the functions `train` and `validate` as described above, passing the gRPC channel to the constructor. Finally the user invokes the `run` method on the `FednClient` object to connect the client to the task stream from the assigned combiner.
 
 Below are instruction for building the library and client executable from source.
@@ -46,7 +46,7 @@ Run the following commands to build the library `fednlib`. Standing in the proje
     popd
 
 #### Build the client executable
-Now that the library is built, we can build the client executable. Here we show how to build the example client `my_client`, but the process is analogous for any FEDn C++ client file. Standing in the `examples` folder:
+Now that the library is built, we can build the client executable. Here we show how to build the example client `my-client`, but the process is analogous for any FEDn C++ client file. Standing in the `examples` folder:
 
     mkdir -p build
     cd build
@@ -75,7 +75,7 @@ Next, follow the instructions in the README inside fedn/examples/mnist-keras for
 ## Start the C++ client
 Standing in `fedn-cpp-client/examples/build`, run the following command:
 
-    ./my_client
+    ./my-client
 
 **Note:** You can change the name of the client executable in the `CMakeLists.txt` file for your client.
 
