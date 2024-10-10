@@ -60,8 +60,14 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     // Convert the JSON data to a string
     std::string jsonData = requestData.dump();
 
+    // Select HTTP protocol based on insecure flag
+    std::string httpProtocol = "https://";
+    if (controllerConfig["insecure"] == "true") {
+        httpProtocol = "http://";
+    }
+
     // add endpoint /add_client to the apiUrl
-    const std::string addClientApiUrl = apiUrl + "/add_client";
+    const std::string addClientApiUrl = httpProtocol + apiUrl + "/add_client";
 
     // Set libcurl options for the POST request
     curl_easy_setopt(curl, CURLOPT_URL, addClientApiUrl.c_str());
