@@ -144,9 +144,18 @@ std::map<std::string, std::string> FednClient::assignCombiner() {
     // Pretty print of the response
     std::cout << "Response: " << httpResponseData.dump(4) << std::endl;
 
+    if (combinerConfig["insecure"] == "true") {
+        // Concatenate host and port for insecure connection
+        std::string host = httpResponseData["host"].get<std::string>();
+        int port = httpResponseData["port"].get<int>();
+        combinerConfig["host"] = host + ":" + std::to_string(port);
+    } else {
+        // For secure connection, use the host as is
+        combinerConfig["host"] = httpResponseData["host"].get<std::string>();
+    }
+
     // Setup gRPC channel configuration
-    combinerConfig["host"] = httpResponseData["host"];
-    combinerConfig["proxy_host"] = httpResponseData["fqdn"];
+    combinerConfig["proxy_host"] = httpResponseData["fqdn"].is_null() ? "" : httpResponseData["fqdn"].get<std::string>();
     combinerConfig["token"] = httpClient->getToken();
 
     return combinerConfig;
@@ -278,7 +287,7 @@ void FednClient::setCombinerHost(std::string host) {
 }
 
 /**
- * @brief Sets the insecure mode for the FednClient.
+ * @brief Sets the insecure mode in the combiner configuration.
  *
  * This method configures the client to operate in insecure mode if the 
  * parameter is set to true.
@@ -287,8 +296,37 @@ void FednClient::setCombinerHost(std::string host) {
  *                 - true: Enable insecure mode.
  *                 - false: Disable insecure mode.
  */
-void FednClient::setInsecure(bool insecure) {
+void FednClient::setInsecureCombiner(bool insecure) {
     combinerConfig["insecure"] = insecure ? "true" : "false";
+}
+
+/**
+ * @brief Sets the insecure mode in the controller configuration.
+ *
+ * This method configures the client to operate in insecure mode for controller
+ * communications if the parameter is set to true.
+ *
+ * @param insecure A boolean value indicating whether to enable insecure mode.
+ *                 - true: Enable insecure mode.
+ *                 - false: Disable insecure mode.
+ */
+void FednClient::setInsecureController(bool insecure) {
+    controllerConfig["insecure"] = insecure ? "true" : "false";
+}
+
+/**
+ * @brief Sets the insecure mode for both combiner and controller configurations.
+ *
+ * This method configures the client to operate in insecure mode for both
+ * combiner and controller communications if the parameter is set to true.
+ *
+ * @param insecure A boolean value indicating whether to enable insecure mode.
+ *                 - true: Enable insecure mode for both combiner and controller.
+ *                 - false: Disable insecure mode for both combiner and controller.
+ */
+void FednClient::setInsecure(bool insecure) {
+    setInsecureCombiner(insecure);
+    setInsecureController(insecure);
 }
 
 /**
