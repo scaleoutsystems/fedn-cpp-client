@@ -130,7 +130,7 @@ void GrpcClient::connectTaskStream() {
       else if (task.type() == StatusType::MODEL_VALIDATION) {
         this->validateGlobalModel(task.model_id(), task);
       }
-      else if (task.type() == StatusType::INFERENCE) {
+      else if (task.type() == StatusType::MODEL_PREDICTION) {
         this->predictGlobalModel(task.model_id(), task);
       }
       
