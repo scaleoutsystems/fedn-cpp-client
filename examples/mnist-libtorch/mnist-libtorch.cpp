@@ -1,11 +1,13 @@
 #include "../../include/fednlib.h"
 #include "../../cnpy/cnpy.h"
 #include <torch/torch.h>
+#include <torch/script.h>
 #include <vector>
 #include <fstream>
 #include <armadillo>
 #include <typeinfo>
-
+#include <filesystem>
+#include <stdexcept>
 // Define the model class
 struct Net : torch::nn::Module {
     torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
@@ -98,6 +100,73 @@ float compute_accuracy(torch::Tensor predictions, torch::Tensor labels) {
     auto predicted_labels = predictions.argmax(1);
     return predicted_labels.eq(labels).sum().item<float>() / labels.size(0);
 }
+// Callback function for writing downloaded data to a file
+size_t writeDownloadedDataToFile(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t realsize = size * nmemb;
+    std::ofstream* file = static_cast<std::ofstream*>(userp);
+    file->write(static_cast<char*>(contents), realsize);
+    return realsize;
+}
+
+void downloadMNISTData(const std::string& data_path) {
+    std::cout << "Downloading MNIST data..." << std::endl;
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        std::cerr << "Failed to initialize CURL" << std::endl;
+        return;
+    }
+
+    std::string base_url = "https://storage.googleapis.com/public-scaleout/mnist-pytorch/data/train/MNIST/raw/";
+    std::string file_names[4] = {
+        "train-images-idx3-ubyte",
+        "train-labels-idx1-ubyte",
+        "t10k-images-idx3-ubyte",
+        "t10k-labels-idx1-ubyte"
+    };
+
+    for (const auto& file_name : file_names) {
+        std::string file_path = data_path + "/" + file_name;
+        std::cout << "Downloading " << file_name << " from " << base_url << std::endl;
+        
+        std::ofstream output_file(file_path, std::ios::binary);
+        if (!output_file.is_open()) {
+            std::cerr << "Failed to open file for writing: " << file_path << std::endl;
+            continue;
+        }
+
+        std::cout << "Opened file for " << file_name << std::endl;
+
+        curl_easy_setopt(curl, CURLOPT_URL, (base_url + file_name).c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeDownloadedDataToFile);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &output_file);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);  // Enable verbose output for debugging
+
+        CURLcode res = curl_easy_perform(curl);
+        
+        if (res != CURLE_OK) {
+            std::cerr << "Download failed for " << file_name << ": " << curl_easy_strerror(res) << std::endl;
+        } else {
+            long http_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            if (http_code == 200) {
+                std::cout << "Download successful for " << file_name << std::endl;
+                
+                // Check file size
+                output_file.seekp(0, std::ios::end);
+                std::streampos fileSize = output_file.tellp();
+                std::cout << "Downloaded file size: " << fileSize << " bytes" << std::endl;
+            } else {
+                std::cerr << "HTTP error: " << http_code << std::endl;
+            }
+        }
+
+        output_file.close();
+        std::cout << "Closed file for " << file_name << std::endl;
+    }
+
+    curl_easy_cleanup(curl);
+}
 
 class CustomGrpcClient : public GrpcClient {
 public:
@@ -116,10 +185,12 @@ public:
         const double learning_rate = 0.001;
 
         // Load the MNIST dataset
-        auto train_dataset = torch::data::datasets::MNIST("../data")
+        std::string data_path = "../data";
+        auto train_dataset = torch::data::datasets::MNIST(data_path)
                                 .map(torch::data::transforms::Normalize<>(0.1307, 0.3081))
                                 .map(torch::data::transforms::Stack<>());
-        auto test_dataset = torch::data::datasets::MNIST("../data", torch::data::datasets::MNIST::Mode::kTest)
+
+        auto test_dataset = torch::data::datasets::MNIST(data_path, torch::data::datasets::MNIST::Mode::kTest)
                                 .map(torch::data::transforms::Normalize<>(0.1307, 0.3081))
                                 .map(torch::data::transforms::Stack<>());
 
@@ -170,11 +241,12 @@ public:
         model.eval();  // Set the model to evaluation mode
 
         // Load the train and test datasets
-        auto train_dataset = torch::data::datasets::MNIST("../data")
+        std::string data_path = "../data";
+        auto train_dataset = torch::data::datasets::MNIST(data_path)
                                 .map(torch::data::transforms::Normalize<>(0.1307, 0.3081))
                                 .map(torch::data::transforms::Stack<>());
 
-        auto test_dataset = torch::data::datasets::MNIST("../data", torch::data::datasets::MNIST::Mode::kTest)
+        auto test_dataset = torch::data::datasets::MNIST(data_path, torch::data::datasets::MNIST::Mode::kTest)
                                 .map(torch::data::transforms::Normalize<>(0.1307, 0.3081))
                                 .map(torch::data::transforms::Stack<>());
 
@@ -255,6 +327,16 @@ int main(int argc, char** argv) {
     std::shared_ptr<HttpClient> http_client = client.getHttpClient();
     
     std::shared_ptr<GrpcClient> customGrpcClient = std::make_shared<CustomGrpcClient>(channel);
+
+    // Check if ../data exists
+    std::string data_path = "../data";
+    if (!std::filesystem::exists(data_path)) {
+        // Create the ../data directory
+        std::filesystem::create_directory(data_path);
+
+        // Download the MNIST dataset
+        downloadMNISTData(data_path);
+    }
 
     client.run(customGrpcClient);
 
