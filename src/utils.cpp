@@ -17,7 +17,7 @@
  * @param output Pointer to the string where the received data will be appended.
  * @return The total size of the data processed (size * nmemb).
  */
-size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
+size_t writeHttpResponseToString(void* contents, size_t size, size_t nmemb, std::string* output) {
     size_t totalSize = size * nmemb;
     output->append(static_cast<char*>(contents), totalSize);
     return totalSize;

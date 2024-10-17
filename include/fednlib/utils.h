@@ -9,7 +9,7 @@
 
 using json = nlohmann::json;
 
-size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* output);
+size_t writeHttpResponseToString(void* contents, size_t size, size_t nmemb, std::string* output);
 void saveModelToFile(const std::string& modelData, const std::string& modelPath);
 void saveMetricsToFile(const json& metrics, const std::string& metricPath);
 std::string loadModelFromFile(const std::string& modelPath);
