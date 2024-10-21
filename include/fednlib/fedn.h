@@ -25,6 +25,8 @@ public:
 
     void setAuthScheme(std::string authScheme);
     void setCombinerHost(std::string host);
+    void setInsecureCombiner(bool insecure);
+    void setInsecureController(bool insecure);
     void setInsecure(bool insecure);
     void setProxyHost(std::string proxyHost);
     void setToken(std::string token);
