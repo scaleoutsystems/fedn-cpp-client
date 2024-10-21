@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
-project(hw-cpp VERSION 1.0 DESCRIPTION "hw client in C++")
+project(hw-cpp-example VERSION 1.0 DESCRIPTION "Example FEDn client in C++")
+
 
 # Find required dependencies for HTTP client
 find_package(CURL REQUIRED)
-set(YAML_CPP_DIR "<path-to-yaml-cpp>")
+set(YAML_CPP_DIR "/opt/homebrew/Cellar/yaml-cpp/0.8.0")
 find_package(yaml-cpp REQUIRED)
 include_directories(${YAML_CPP_DIR}/include)
 link_directories(${YAML_CPP_DIR}/lib)
@@ -46,12 +47,14 @@ endif()
 
 # If using Armadillo
 # Ensure that Armadillo is installed on the system
-#set(ARMADILLO_LIBRARY "~/.local/lib/cmake/lib/libarmadillo.so")
-#set(ARMADILLO_INCLUDE_DIR "~/.local/lib/cmake/include")
-#set(ARMADILLO_INCLUDE_DIRS "/usr/include")
+set(ARMADILLO_LIBRARY "/opt/homebrew/Cellar/armadillo/14.0.2_1")
+set(ARMADILLO_INCLUDE_DIR "/opt/homebrew/opt/armadillo/include")
+set(ARMADILLO_INCLUDE_DIRS "/usr/include")
+
+link_directories(/opt/homebrew/opt/armadillo/lib)
 
 # Proto file for project
-get_filename_component(fedn_proto "src/protos/fedn.proto" ABSOLUTE)
+get_filename_component(fedn_proto "../../src/protos/fedn.proto" ABSOLUTE)
 get_filename_component(fedn_proto_path "${fedn_proto}" PATH)
 
 # Generated sources
@@ -88,43 +91,44 @@ target_link_libraries(fedn_grpc_proto
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
 
-# Include directories fednlib
-include_directories(include)
+# Manually specify the path where fednlib was built (adjust path if necessary)
+set(FEDNLIB_DIR "${CMAKE_SOURCE_DIR}/../../build")  # Adjust this path to point to where libfednlib.a is built
 
-# Source files fednlib
-set(SOURCES
-    src/http.cpp
-    src/grpc.cpp
-    src/fedn.cpp
-    src/utils.cpp
-)
+# Include fednlib's include directory for fednlib.h and other headers
+include_directories(${CMAKE_SOURCE_DIR}/../include)  # Point to the headers in the parent include directory
 
-# Add fednlib as a library
-add_library(fednlib STATIC ${SOURCES})
+# Specify the directory where the built fednlib library is located
+link_directories(${FEDNLIB_DIR})  # Add the directory where libfednlib.a resides
 
-# Create an alias target
-add_library(fednlib::fednlib ALIAS fednlib)
+# Set the C++ standard to C++17, which is required by LibTorch
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Link the fednlib with libraries
-target_link_libraries(fednlib PUBLIC 
-  fedn_grpc_proto 
-  absl::flags 
-  absl::flags_parse 
-  ${_REFLECTION} 
-  ${_GRPC_GRPCPP} 
-  ${_PROTOBUF_LIBPROTOBUF} 
-  CURL::libcurl 
-  yaml-cpp 
-  ${YAML_CPP_LIBRARIES} 
+# Set the path to the directory where LibTorch was unzipped
+set(CMAKE_PREFIX_PATH "/Users/benjaminastrand/Documents/libtorch")
+
+# Find LibTorch (PyTorch C++ API)
+find_package(Torch REQUIRED)
+
+# Include LibTorch headers
+include_directories(${TORCH_INCLUDE_DIRS})
+
+set(CMAKE_BUILD_RPATH "/opt/homebrew/opt/libomp/lib;/Users/benjaminastrand/Documents/libtorch/lib")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I/opt/homebrew/opt/libomp/include")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/homebrew/opt/libomp/lib")
+
+find_package(Armadillo REQUIRED)
+
+# Add mnist-libtorch as an executable
+add_executable(mnist-libtorch "mnist-libtorch.cpp")
+
+# Link the executable with libraries
+target_link_libraries(mnist-libtorch PUBLIC
+  fednlib
+  fedn_grpc_proto
   nlohmann_json::nlohmann_json
+  ${TORCH_LIBRARIES} 
+  armadillo
+  yaml-cpp
+  CURL::libcurl
 )
-
-if(DEFINED ${ARMADILLO_LIBRARY})
-target_link_libraries(fednlib PRIVATE ${ARMADILLO_LIBRARY})
-endif()
-
-# Link header files to fednlib
-target_include_directories(fednlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-# Include directories
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})

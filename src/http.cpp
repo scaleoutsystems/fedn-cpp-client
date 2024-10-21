@@ -66,7 +66,7 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     // Set libcurl options for the POST request
     curl_easy_setopt(curl, CURLOPT_URL, addClientApiUrl.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonData.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeHttpResponseToString);
     // allow all redirects
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
