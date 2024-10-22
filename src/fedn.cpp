@@ -352,3 +352,58 @@ void FednClient::setToken(std::string token) {
     controllerConfig["token"] = token;
     combinerConfig["token"] = token;
 }
+
+/**
+ * @brief Sets the API URL for the FednClient.
+ * 
+ * This method updates the controller configuration with the specified API URL.
+ * 
+ * @param apiUrl The API URL to be set.
+ */
+void FednClient::setControllerUrl(std::string apiUrl) {
+    controllerConfig["api_url"] = apiUrl;
+}
+
+/**
+ * @brief Sets the client ID for the FednClient.
+ * 
+ * This method updates the controller configuration with the specified client ID.
+ * 
+ * @param clientId The client ID to be set.
+ */
+void FednClient::setClientId(std::string clientId) {
+    controllerConfig["client_id"] = clientId;
+}
+
+/**
+ * @brief Sets the name for the FednClient.
+ * 
+ * This method updates the controller configuration with the specified name.
+ * 
+ * @param name The name to be set.
+ */
+void FednClient::setName(std::string name) {
+    controllerConfig["name"] = name;
+}
+
+/**
+ * @brief Sets the package for the FednClient.
+ * 
+ * This method updates the controller configuration with the specified package.
+ * 
+ * @param package The package to be set.
+ */
+void FednClient::setPackage(std::string package) {
+    controllerConfig["package"] = package;
+}
+
+/**
+ * @brief Sets the preferred combiner for the FednClient.
+ * 
+ * This method updates the controller configuration with the specified preferred combiner.
+ * 
+ * @param preferredCombiner The preferred combiner to be set.
+ */
+void FednClient::setPreferredCombiner(std::string preferredCombiner) {
+    controllerConfig["preferred_combiner"] = preferredCombiner;
+}
