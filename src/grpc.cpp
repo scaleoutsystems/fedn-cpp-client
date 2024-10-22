@@ -525,14 +525,8 @@ void GrpcClient::validate(const std::string& inModelPath, const std::string& out
 void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& requestData) {
     std::cout << "Validating global model: " << modelID << std::endl;
 
-    // Download model from server
-    std::cout << "Downloading model: " << modelID << std::endl;
-    std::string modelData = GrpcClient::downloadModel(modelID);
-
-    // Save model to file
-    // TODO: model should be saved to a temporary file and chunks should be written to it
-    std::cout << "Saving model to file: " << modelID << std::endl;
-    saveModelToFile(modelData, std::string("./") + modelID + std::string(".bin"));
+    // Stream model to file
+    downloadModelToFile(modelID, std::string("./") + modelID + std::string(".bin"));
 
     const std::string metricPath = std::string("./") + modelID + std::string(".json");
 
@@ -594,19 +588,14 @@ void GrpcClient::predictGlobalModel(const std::string& modelID, TaskRequest& req
     const std::string modelPath = std::string("./") + modelID + std::string(".bin");
     const std::string predictionPath = std::string("./") + modelID + std::string("-out.json");
 
-    // Download model from server
-    std::cout << "Downloading model: " << modelID << std::endl;
-    std::string modelData = GrpcClient::downloadModel(modelID);
-
-    // Save model to file
-    std::cout << "Saving model to file: " << modelID << std::endl;
-    saveModelToFile(modelData, modelPath);
+    // Stream model to file
+    downloadModelToFile(modelID, modelPath);
 
     // Perform model prediction
     this->predict(modelPath, predictionPath);
 
     // Read the prediction data from the file
-    std::cout << "Loading prediction data from file: " << modelID << std::endl;
+    std::cout << "Loading prediction data from file: " << predictionPath << std::endl;
     json predictionData = loadMetricsFromFile(predictionPath);
 
     // Send model prediction response to server
