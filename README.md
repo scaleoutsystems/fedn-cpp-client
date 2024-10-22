@@ -4,7 +4,7 @@ A FEDn client in C++.
 **Note:** This is a prototype and is still in active development so the interface might change frequently! The purpose of this prototype is to demonstrate how the C++ client can be used to connect to the federated network. In the example below, there is no actual model training being performed on the client.
 
 ## fednlib API
-To create a FEDn client in C++, the user creates a C++ source file where they implement their machine learning code and use the FEDn library API `fednlib` to connect the client to the federated network. The file `my_client.cpp` in the `examples` folder shows how the user implements their own machine learning code by overriding the methods `train`and `validate` of the `GrpcClient` class, and connect the client to the network in the `main` function.
+To create a FEDn client in C++, the user creates a C++ source file where they implement their machine learning code and use the FEDn library API `fednlib` to connect the client to the federated network. The `examples` folder contains code that showcases how to use the `fednlib` API to connect a client to a combiner and process task requests such as training and validation. The example `my-client` is a minimal example that shows how the user implements their own machine learning code by overriding the methods `train`and `validate` of the `GrpcClient` class, and connect the client to the network in the `main` function. The `mnist-libtorch` example trains a simple neural network with libtorch (C++ interface to PyTorch) to solve the MNIST classification problem and gives a more concrete example of how to implement C++ machine learning code with FEDn.
 
 * `train`: The user starts by reading the model from a binary file into the preferred format (depending on the ML library that is used), implements the machine learning logic, and saves the updated model back to a file in binary format. In the example `my_client.cpp`, this function simply reads the global model into memory and writes it back to file.
 * `validate`: The user starts by reading the model from a binary file, computes the preferred validation metrics, saves the metrics in a JSON object and writes the JSON to file. In the example `my_client.cpp`, this function creates a JSON with mock validation data and writes it to file.
@@ -47,7 +47,7 @@ Run the following commands to build the library `fednlib`. Standing in the proje
     popd
 
 #### Build the client executable
-Now that the library is built, we can build the client executable. Here we show how to build the example client `my_client`, but the process is analogous for any FEDn C++ client file. Standing in the `examples` folder:
+Now that the library is built, we can build the client executable. Here we show how to build the example client `my-client`, but the process is analogous for any FEDn C++ client file. Standing in the `my-client` folder:
 
     mkdir -p build
     cd build
@@ -74,15 +74,15 @@ It will take some time to build the images, go grab a coffee!!
 Next, follow the instructions in the README inside fedn/examples/mnist-keras for section "Preparing the environment, the local data, the compute package and seed model". Once you have the package and the seed model you can either upload these via using the [APIClient](https://fedn.readthedocs.io/en/stable/fedn.network.api.html#fedn.network.api.client.APIClient) (obs that you need to install the FEDn API to your local environment, for example using a virtual python environment).
 
 ## Start the C++ client
-Standing in `fedn-cpp-client/examples/build`, run the following command:
+Standing in `my-client/build`, run the following command:
 
-    ./my_client
+    ./my-client
 
 **Note:** You can change the name of the client executable in the `CMakeLists.txt` file for your client.
 
-The expected output should be similar to this:
+This message should now be printed to the terminal once every few seconds:
 
-    Response: Heartbeat received from client test
+    Response: Heartbeat received
 
 The client is then waiting for model update requests from the combiner. **Start** a training session either via the Studio dashboard or the Python APIClient. The expected output should look similar to this:
 

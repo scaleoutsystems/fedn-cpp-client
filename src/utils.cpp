@@ -17,7 +17,7 @@
  * @param output Pointer to the string where the received data will be appended.
  * @return The total size of the data processed (size * nmemb).
  */
-size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
+size_t writeHttpResponseToString(void* contents, size_t size, size_t nmemb, std::string* output) {
     size_t totalSize = size * nmemb;
     output->append(static_cast<char*>(contents), totalSize);
     return totalSize;
@@ -247,12 +247,20 @@ std::map<std::string, std::string> readControllerConfig(YAML::Node config) {
     std::cout << "Reading HTTP request data from config file" << std::endl;
     std::map<std::string, std::string> controllerConfig;
 
+    // Check if insecure is in the config, else use default false
+    if (config["insecure"]) {
+        controllerConfig["insecure"] = config["insecure"].as<std::string>();
+    }
+    else {
+        controllerConfig["insecure"] = "false";
+    }
+
     // Check if there is a valid "discover_host" key in the config
     std::string apiUrl = config["discover_host"].as<std::string>();
     if (apiUrl.empty()) {
         throw std::runtime_error("Invalid discover_host.");
     }
-    controllerConfig["api_url"] = "https://" + apiUrl;
+    controllerConfig["api_url"] = apiUrl;
 
     // Check if there is a "token" key in the config file
     std::string token = "";

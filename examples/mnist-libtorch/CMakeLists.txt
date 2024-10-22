@@ -47,12 +47,14 @@ endif()
 
 # If using Armadillo
 # Ensure that Armadillo is installed on the system
-#set(ARMADILLO_LIBRARY "~/.local/lib/cmake/lib/libarmadillo.so")
-#set(ARMADILLO_INCLUDE_DIR "~/.local/lib/cmake/include")
-#set(ARMADILLO_INCLUDE_DIRS "/usr/include")
+set(ARMADILLO_LIBRARY "/opt/homebrew/Cellar/armadillo/14.0.2_1")
+set(ARMADILLO_INCLUDE_DIR "/opt/homebrew/opt/armadillo/include")
+set(ARMADILLO_INCLUDE_DIRS "/usr/include")
+
+link_directories(/opt/homebrew/opt/armadillo/lib)
 
 # Proto file for project
-get_filename_component(fedn_proto "../src/protos/fedn.proto" ABSOLUTE)
+get_filename_component(fedn_proto "../../src/protos/fedn.proto" ABSOLUTE)
 get_filename_component(fedn_proto_path "${fedn_proto}" PATH)
 
 # Generated sources
@@ -90,7 +92,7 @@ target_link_libraries(fedn_grpc_proto
   ${_PROTOBUF_LIBPROTOBUF})
 
 # Manually specify the path where fednlib was built (adjust path if necessary)
-set(FEDNLIB_DIR "${CMAKE_SOURCE_DIR}/../build")  # Adjust this path to point to where libfednlib.a is built
+set(FEDNLIB_DIR "${CMAKE_SOURCE_DIR}/../../build")  # Adjust this path to point to where libfednlib.a is built
 
 # Include fednlib's include directory for fednlib.h and other headers
 include_directories(${CMAKE_SOURCE_DIR}/../include)  # Point to the headers in the parent include directory
@@ -98,20 +100,35 @@ include_directories(${CMAKE_SOURCE_DIR}/../include)  # Point to the headers in t
 # Specify the directory where the built fednlib library is located
 link_directories(${FEDNLIB_DIR})  # Add the directory where libfednlib.a resides
 
-# Add my_client as an executable
-add_executable(my_client "my_client.cpp")
+# Set the C++ standard to C++17, which is required by LibTorch
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Set the path to the directory where LibTorch was unzipped
+set(CMAKE_PREFIX_PATH "<path-to-libtorch>")
+
+# Find LibTorch (PyTorch C++ API)
+find_package(Torch REQUIRED)
+
+# Include LibTorch headers
+include_directories(${TORCH_INCLUDE_DIRS})
+
+set(CMAKE_BUILD_RPATH "<path-to-libtorch>/lib")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I/opt/homebrew/opt/libomp/include")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/homebrew/opt/libomp/lib")
+
+find_package(Armadillo REQUIRED)
+
+# Add mnist-libtorch as an executable
+add_executable(mnist-libtorch "mnist-libtorch.cpp")
 
 # Link the executable with libraries
-target_link_libraries(my_client
+target_link_libraries(mnist-libtorch PUBLIC
   fednlib
   fedn_grpc_proto
-  yaml-cpp
   nlohmann_json::nlohmann_json
-  ${CURL_LIBRARIES}
-  ${_REFLECTION}
-  ${_GRPC_GRPCPP}
-  ${_PROTOBUF_LIBPROTOBUF}
+  ${TORCH_LIBRARIES} 
+  armadillo
+  yaml-cpp
+  CURL::libcurl
 )
-
-# Set the include directories for the example
-include_directories(${CMAKE_SOURCE_DIR}/include)

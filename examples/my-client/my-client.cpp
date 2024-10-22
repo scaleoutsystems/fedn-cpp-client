@@ -1,4 +1,4 @@
-#include "../include/fednlib.h"
+#include "../../include/fednlib.h"
 
 class CustomGrpcClient : public GrpcClient {
 public:
@@ -60,7 +60,7 @@ public:
 };
 
 int main(int argc, char** argv) {
-    FednClient client("../../client.yaml");
+    FednClient client("../../../client.yaml");
 
     std::map<std::string, std::string> combinerConfig = client.getCombinerConfig();
 
