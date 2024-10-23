@@ -30,7 +30,7 @@ public:
     void setInsecure(bool insecure);
     void setProxyHost(std::string proxyHost);
     void setToken(std::string token);
-    void setApiUrl(std::string apiUrl);
+    void setControllerUrl(std::string apiUrl);
     void setClientId(std::string clientId);
     void setName(std::string name);
     void setPackage(std::string package);

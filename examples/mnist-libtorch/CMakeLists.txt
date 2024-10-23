@@ -4,7 +4,7 @@ project(hw-cpp-example VERSION 1.0 DESCRIPTION "Example FEDn client in C++")
 
 # Find required dependencies for HTTP client
 find_package(CURL REQUIRED)
-set(YAML_CPP_DIR "/opt/homebrew/Cellar/yaml-cpp/0.8.0")
+set(YAML_CPP_DIR "<path-to-yaml-cpp>")
 find_package(yaml-cpp REQUIRED)
 include_directories(${YAML_CPP_DIR}/include)
 link_directories(${YAML_CPP_DIR}/lib)
@@ -105,7 +105,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the path to the directory where LibTorch was unzipped
-set(CMAKE_PREFIX_PATH "/Users/benjaminastrand/Documents/libtorch")
+set(CMAKE_PREFIX_PATH "<path-to-libtorch>")
 
 # Find LibTorch (PyTorch C++ API)
 find_package(Torch REQUIRED)
@@ -113,7 +113,7 @@ find_package(Torch REQUIRED)
 # Include LibTorch headers
 include_directories(${TORCH_INCLUDE_DIRS})
 
-set(CMAKE_BUILD_RPATH "/opt/homebrew/opt/libomp/lib;/Users/benjaminastrand/Documents/libtorch/lib")
+set(CMAKE_BUILD_RPATH "<path-to-libtorch>/lib")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I/opt/homebrew/opt/libomp/include")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/homebrew/opt/libomp/lib")
 
