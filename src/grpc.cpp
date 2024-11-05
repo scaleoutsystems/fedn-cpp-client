@@ -159,6 +159,15 @@ std::string GrpcClient::downloadModel(const std::string& modelID) {
     // context
     ClientContext context;
 
+     // Set client
+    Client* client = new Client();
+    client->set_name(name_);
+    client->set_role(WORKER);
+    client->set_client_id(id_);
+
+    // Pass ownership of client to protobuf message
+    request.set_allocated_sender(client);
+
     // Get ClientReader from stream
     std::unique_ptr<ClientReader<ModelResponse> > reader(
         modelserviceStub_->Download(&context, request));
@@ -218,6 +227,15 @@ void GrpcClient::downloadModelToFile(const std::string& modelID, const std::stri
 
     // context
     ClientContext context;
+
+    // Set client
+    Client* client = new Client();
+    client->set_name(name_);
+    client->set_role(WORKER);
+    client->set_client_id(id_);
+
+    // Pass ownership of client to protobuf message
+    request.set_allocated_sender(client);
 
     // Get ClientReader from stream
     std::unique_ptr<ClientReader<ModelResponse> > reader(
