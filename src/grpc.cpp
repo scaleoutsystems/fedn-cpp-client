@@ -25,7 +25,7 @@ using fedn::ModelStatus;
 using fedn::StatusType;
 using fedn::Client;
 using fedn::ClientAvailableMessage;
-using fedn::WORKER;
+using fedn::CLIENT;
 using fedn::Response;
 
 /**
@@ -58,7 +58,7 @@ void GrpcClient::heartBeat() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
-    client->set_role(WORKER);
+    client->set_role(CLIENT);
     client->set_client_id(id_);
 
     Heartbeat request;
@@ -104,7 +104,7 @@ void GrpcClient::connectTaskStream() {
     // Data we are sending to the server.
     Client* client = new Client();
     client->set_name(name_);
-    client->set_role(WORKER);
+    client->set_role(CLIENT);
     client->set_client_id(id_);
 
     ClientAvailableMessage request;
@@ -162,7 +162,7 @@ std::string GrpcClient::downloadModel(const std::string& modelID) {
      // Set client
     Client* client = new Client();
     client->set_name(name_);
-    client->set_role(WORKER);
+    client->set_role(CLIENT);
     client->set_client_id(id_);
 
     // Pass ownership of client to protobuf message
@@ -231,7 +231,7 @@ void GrpcClient::downloadModelToFile(const std::string& modelID, const std::stri
     // Set client
     Client* client = new Client();
     client->set_name(name_);
-    client->set_role(WORKER);
+    client->set_role(CLIENT);
     client->set_client_id(id_);
 
     // Pass ownership of client to protobuf message
@@ -305,7 +305,7 @@ void GrpcClient::uploadModel(std::string& modelID, std::string& modelData) {
     // Client
     Client* client = new Client();
     client->set_name(name_);
-    client->set_role(WORKER);
+    client->set_role(CLIENT);
     client->set_client_id(id_);
 
     // Get ClientWriter from stream
@@ -384,7 +384,7 @@ void GrpcClient::uploadModelFromFile(const std::string& modelID, const std::stri
     // Client
     Client* client = new Client();
     client->set_name(name_);
-    client->set_role(WORKER);
+    client->set_role(CLIENT);
     client->set_client_id(id_);
 
     // Get ClientWriter from stream
@@ -639,7 +639,7 @@ void GrpcClient::sendModelUpdate(const std::string& modelID, std::string& modelU
     // Send model update response to server
     Client client;
     client.set_name(name_);
-    client.set_role(WORKER);
+    client.set_role(CLIENT);
     client.set_client_id(id_);
 
     
@@ -698,7 +698,7 @@ void GrpcClient::sendModelValidation(const std::string& modelID, json& metricDat
     // Send model validation response to server
     Client client;
     client.set_name(name_);
-    client.set_role(WORKER);
+    client.set_role(CLIENT);
     client.set_client_id(id_);
 
     ModelValidation validation;
@@ -756,7 +756,7 @@ void GrpcClient::sendModelPrediction(const std::string& modelID, json& predictio
     // Send model prediction response to server
     Client client;
     client.set_name(name_);
-    client.set_role(WORKER);
+    client.set_role(CLIENT);
     client.set_client_id(id_);
 
     ModelPrediction prediction;
