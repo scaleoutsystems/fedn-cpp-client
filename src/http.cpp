@@ -66,8 +66,8 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
         httpProtocol = "http://";
     }
 
-    // add endpoint /add_client to the apiUrl
-    const std::string addClientApiUrl = httpProtocol + apiUrl + "/add_client";
+    // add endpoint api/v1/clients/add to the apiUrl
+    const std::string addClientApiUrl = httpProtocol + apiUrl + "/api/v1/clients/add";
 
     // Set libcurl options for the POST request
     curl_easy_setopt(curl, CURLOPT_URL, addClientApiUrl.c_str());
