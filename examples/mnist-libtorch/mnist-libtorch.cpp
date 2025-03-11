@@ -4,7 +4,7 @@
 #include <torch/script.h>
 #include <vector>
 #include <fstream>
-#include <armadillo>
+//#include <armadillo>
 #include <typeinfo>
 #include <filesystem>
 #include <stdexcept>

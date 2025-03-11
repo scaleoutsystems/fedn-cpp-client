@@ -56,7 +56,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the path to LibTorch
-set(CMAKE_PREFIX_PATH "<path-to-libtorch>")
+set(CMAKE_PREFIX_PATH "<path-to-libtorch>") # Set the path to the directory where you have unzip the libtorch. 
 find_package(Torch REQUIRED)
 
 if(NOT Torch_FOUND)
@@ -65,9 +65,9 @@ endif()
 
 include_directories(${TORCH_INCLUDE_DIRS})
 
-set(CMAKE_BUILD_RPATH " <path-to-lib-dir>") #For example: /opt/libtorch/lib
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I<path-to-include-dir>") #For example: /usr/include
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L") #For example: /usr/lib 
+# set(CMAKE_BUILD_RPATH " <path-to-lib-dir>")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I<path-to-include-dir>")
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L")
 
 message(STATUS "TORCH_INCLUDE_DIRS: ${TORCH_INCLUDE_DIRS}")
 message(STATUS "TORCH_LIBRARIES: ${TORCH_LIBRARIES}")
@@ -143,7 +143,7 @@ target_link_libraries(mnist-libtorch
   ${_REFLECTION}
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF}
-  armadillo
+# armadillo
   pthread
   ${TORCH_LIBRARIES}
   cnpy
