@@ -3,12 +3,25 @@ project(hw-cpp VERSION 1.0 DESCRIPTION "hw client in C++")
 
 # Find required dependencies for HTTP client
 find_package(CURL REQUIRED)
+if(NOT CURL_FOUND)
+    message(FATAL_ERROR "curl not found! Please set the path.")
+endif()
+
 set(YAML_CPP_DIR "<path-to-yaml-cpp>")
 find_package(yaml-cpp REQUIRED)
+
+if(NOT yaml-cpp_FOUND)
+    message(FATAL_ERROR "yaml-cpp not found! Please set the path.")
+endif()
+
 include_directories(${YAML_CPP_DIR}/include)
 link_directories(${YAML_CPP_DIR}/lib)
+
 find_package(nlohmann_json REQUIRED)
 
+if(NOT nlohmann_json_FOUND)
+    message(FATAL_ERROR "nlohmann_json not found! Please set the path.")
+endif()
 
 include_directories(${YAML_CPP_INCLUDE_DIRS})
 
@@ -43,12 +56,6 @@ find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin)
 else()
 set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 endif()
-
-# If using Armadillo
-# Ensure that Armadillo is installed on the system
-#set(ARMADILLO_LIBRARY "~/.local/lib/cmake/lib/libarmadillo.so")
-#set(ARMADILLO_INCLUDE_DIR "~/.local/lib/cmake/include")
-#set(ARMADILLO_INCLUDE_DIRS "/usr/include")
 
 # Proto file for project
 get_filename_component(fedn_proto "src/protos/fedn.proto" ABSOLUTE)

@@ -1,4 +1,4 @@
-#include "../../include/fednlib.h"
+#include "fednlib.h"
 #include "../../cnpy/cnpy.h"
 #include <torch/torch.h>
 #include <torch/script.h>
@@ -8,6 +8,8 @@
 #include <typeinfo>
 #include <filesystem>
 #include <stdexcept>
+#include <cstdlib>
+
 // Define the model class
 struct Net : torch::nn::Module {
     torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
@@ -29,68 +31,109 @@ struct Net : torch::nn::Module {
 };
 
 // Save the model parameters to a binary file
+
 void saveParameters(Net& model, const std::string& out_path) {
-    std::vector<double> parameters_vec;
 
-    // Iterate over all parameters in the model
-    for (const auto& param : model.named_parameters()) {
-        auto tensor = param.value().cpu().to(torch::kFloat64);
-        auto flattened = tensor.view(-1);
-        parameters_vec.insert(parameters_vec.end(), 
-                              flattened.data_ptr<double>(),
-                              flattened.data_ptr<double>() + flattened.numel());
+    std::cout << "Saving model to " << out_path << "..." << std::endl;
+
+    try {
+        // Convert tensors to raw float arrays
+        float* fc1_weight = model.fc1->weight.data_ptr<float>();
+        float* fc1_bias = model.fc1->bias.data_ptr<float>();
+
+        float* fc2_weight = model.fc2->weight.data_ptr<float>();
+        float* fc2_bias = model.fc2->bias.data_ptr<float>();
+
+        float* fc3_weight = model.fc3->weight.data_ptr<float>();
+        float* fc3_bias = model.fc3->bias.data_ptr<float>();
+
+        // Save tensors to NPZ with specific names (without .npy suffix)
+        cnpy::npz_save(out_path, "0", fc1_weight, {64, 784}, "w");  // Write mode for the first file
+        cnpy::npz_save(out_path, "1", fc1_bias, {64}, "a");         // Append mode for the rest
+        cnpy::npz_save(out_path, "2", fc2_weight, {32, 64}, "a");
+        cnpy::npz_save(out_path, "3", fc2_bias, {32}, "a");
+        cnpy::npz_save(out_path, "4", fc3_weight, {10, 32}, "a");
+        cnpy::npz_save(out_path, "5", fc3_bias, {10}, "a");
+
+        std::cout << "Model parameters saved successfully to " << out_path << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error saving NPZ file: " << e.what() << std::endl;
     }
-
-    // Print the size of the concatenated parameters (for debugging)
-    std::cout << "Concatenated parameters size: " << parameters_vec.size() << std::endl;
-
-    // Save the parameters to a binary file
-    std::ofstream output_file(out_path, std::ios::out | std::ios::binary);
-    output_file.write(reinterpret_cast<const char*>(parameters_vec.data()), parameters_vec.size() * sizeof(double));
-    output_file.close();
-
-    std::cout << "Model parameters saved to: " << out_path << std::endl;
 }
 
 // Load the model parameters from a binary file
+
 Net loadParameters(const std::string& in_path) {
+
+    std::cout << "Loading model parameters from " << in_path << "..." << std::endl;
+
     Net model;
+   
+    if (!std::filesystem::exists(in_path)) {
+        std::cerr << "Error: model file " << in_path << " not found! " << std::endl;
+        return model;    
+    }
+    else {
+        std::cout << "Model file exist: " << in_path << "found! " << std::endl;	    
 
-    // Read the parameters from the binary file
-    std::ifstream input_file(in_path, std::ios::in | std::ios::binary);
-    input_file.seekg(0, std::ios::end);
-    size_t file_size = input_file.tellg();
-    input_file.seekg(0, std::ios::beg);
+    }    
 
-    std::vector<double> parameters_vec(file_size / sizeof(double));
-    input_file.read(reinterpret_cast<char*>(parameters_vec.data()), file_size);
-    input_file.close();
+    // Step 1: Create temporary extraction folder
+    std::string extract_dir = in_path + "_extracted";
+    std::filesystem::create_directories(extract_dir);
 
-    // Print the size of the loaded parameters (for debugging)
-    std::cout << "Loaded parameters size: " << parameters_vec.size() << std::endl;
-
-    // Pointer to the raw data
-    double* param_data = parameters_vec.data();
-
-    // Iterate over all parameters in the model and load the data
-    for (auto& param : model.named_parameters()) {
-        auto& tensor = param.value();
-        size_t numel = tensor.numel();
-        
-        // Create a new tensor with the loaded data
-        auto new_tensor = torch::from_blob(param_data, {static_cast<long>(numel)}, torch::kFloat64).clone();
-        
-        // Reshape the tensor to match the original shape
-        new_tensor = new_tensor.reshape(tensor.sizes());
-        
-        // Copy the data to the model parameter
-        tensor.data().copy_(new_tensor);
-
-        // Move the pointer to the next block of data
-        param_data += numel;
+    // Step 2: Extract the zip file
+    std::string unzip_cmd = "unzip -o " + in_path + " -d " + extract_dir;
+    int unzip_status = system(unzip_cmd.c_str());
+    if (unzip_status != 0) {
+        std::cerr << "Error: Failed to unzip file " << in_path << std::endl;
+        return model;
     }
 
-    std::cout << "Model parameters loaded from: " << in_path << std::endl;
+    // Step 3: Verify extracted files
+    for (int i = 0; i < 6; i++) {
+        std::string file_path = extract_dir + "/" + std::to_string(i) + ".npy";
+        if (!std::filesystem::exists(file_path)) {
+            std::cerr << "Error: Expected file " << file_path << " not found!" << std::endl;
+            return model;
+        }
+    }
+
+    // Step 4: Load model weights
+    try {
+        cnpy::NpyArray fc1_weight_arr = cnpy::npy_load(extract_dir + "/0.npy");
+        cnpy::NpyArray fc1_bias_arr = cnpy::npy_load(extract_dir + "/1.npy");
+        cnpy::NpyArray fc2_weight_arr = cnpy::npy_load(extract_dir + "/2.npy");
+        cnpy::NpyArray fc2_bias_arr = cnpy::npy_load(extract_dir + "/3.npy");
+        cnpy::NpyArray fc3_weight_arr = cnpy::npy_load(extract_dir + "/4.npy");
+        cnpy::NpyArray fc3_bias_arr = cnpy::npy_load(extract_dir + "/5.npy");
+
+         // 🛠 **FIXED: Transpose the weight matrices**
+        auto fc1_weight = torch::from_blob(fc1_weight_arr.data<float>(), {784, 64}).t().clone();
+        auto fc1_bias = torch::from_blob(fc1_bias_arr.data<float>(), {64}).clone();
+        auto fc2_weight = torch::from_blob(fc2_weight_arr.data<float>(), {64, 32}).t().clone();
+        auto fc2_bias = torch::from_blob(fc2_bias_arr.data<float>(), {32}).clone();
+        auto fc3_weight = torch::from_blob(fc3_weight_arr.data<float>(), {32, 10}).t().clone();
+        auto fc3_bias = torch::from_blob(fc3_bias_arr.data<float>(), {10}).clone();
+
+
+	// Correctly updating model weights
+        model.fc1->weight.set_data(fc1_weight);
+        model.fc1->bias.set_data(fc1_bias);
+        model.fc2->weight.set_data(fc2_weight);
+        model.fc2->bias.set_data(fc2_bias);
+        model.fc3->weight.set_data(fc3_weight);
+        model.fc3->bias.set_data(fc3_bias);
+
+        std::cout << "Model parameters loaded successfully!" << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading model parameters: " << e.what() << std::endl;
+    }
+
+    // Step 5: Cleanup extracted directory
+    std::filesystem::remove_all(extract_dir);
+    std::cout << "Cleanup complete: Removed " << extract_dir << std::endl;
 
     return model;
 }
@@ -336,6 +379,13 @@ int main(int argc, char** argv) {
 
         // Download the MNIST dataset
         downloadMNISTData(data_path);
+    }
+    
+    std::string seed_model_path = "../seed.npz";
+    if (!std::filesystem::exists(seed_model_path)) {
+        // Create the ../data directory
+        Net model;
+        saveParameters(model, seed_model_path);
     }
 
     client.run(customGrpcClient);

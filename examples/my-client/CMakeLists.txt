@@ -4,12 +4,24 @@ project(hw-cpp-example VERSION 1.0 DESCRIPTION "Example FEDn client in C++")
 
 # Find required dependencies for HTTP client
 find_package(CURL REQUIRED)
+if(NOT CURL_FOUND)
+    message(FATAL_ERROR "curl not found! Please set the path.")
+endif()
+
+
 set(YAML_CPP_DIR "<path-to-yaml-cpp>")
 find_package(yaml-cpp REQUIRED)
+if(NOT CURL_FOUND)
+    message(FATAL_ERROR "yaml-cpp not found! Please set the path.")
+endif()
+
 include_directories(${YAML_CPP_DIR}/include)
 link_directories(${YAML_CPP_DIR}/lib)
-find_package(nlohmann_json REQUIRED)
 
+find_package(nlohmann_json REQUIRED)
+if(NOT nlohmann_json_FOUND)
+    message(FATAL_ERROR "nlohmann_json not found! Please set the path.")
+endif()
 
 include_directories(${YAML_CPP_INCLUDE_DIRS})
 
