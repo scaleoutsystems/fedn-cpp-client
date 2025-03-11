@@ -10,6 +10,16 @@ To create a FEDn client in C++, the user creates a C++ source file where they im
 * `validate`: The user starts by reading the model from a binary file, computes the preferred validation metrics, saves the metrics in a JSON object and writes the JSON to file. In the example `mnist_client.cpp`, this function creates a JSON with validation data and writes it to file.
 * `main`: The user starts by creating an object of the class `FednClient`, passing the client configuration file path to the constructor. Then the user gets the combiner configuration from the `FednClient` object and uses it to setup a gRPC channel. Then the user creates an object of the custom class which inherits from `GrpcCient` and overrides the functions `train` and `validate` as described above, passing the gRPC channel to the constructor. Finally the user invokes the `run` method on the `FednClient` object to connect the client to the task stream from the assigned combiner.
 
+**NOTE**: This example is designed to work only with the following neural network architecture: 
+
+```c
+ Net() {
+        fc1 = register_module("fc1", torch::nn::Linear(784, 64));
+        fc2 = register_module("fc2", torch::nn::Linear(64, 32));
+        fc3 = register_module("fc3", torch::nn::Linear(32, 10));
+    }
+```
+
 Below are instruction for building the library and client executable from source.
 
 ## Build from source
@@ -141,7 +151,6 @@ The client is then waiting for model update requests from the combiner. **Start*
     Train Epoch: 1 [28832/60000] Loss: 0.464639
 
 You can now check the model trail on the Studio or through the Python APIClient, the length of the list should be greater than 1. If you are using Studio, you can also see the model updates in the dashboard.
-
 
 
 
