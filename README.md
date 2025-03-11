@@ -34,6 +34,8 @@ https://grpc.io/docs/languages/cpp/quickstart/
     include_directories(${YAML_CPP_DIR}/include)
     link_directories(${YAML_CPP_DIR}/lib)
 
+**Note:** If the installation was done using the package manager, the default path for `yaml-cpp` on Linux is typically `/usr`.
+
 ### Build the C++ client
 Before building the client executable, start by building the `fednlib` library.
 
@@ -54,7 +56,21 @@ Now that the library is built, we can build the client executable. Here we show 
     cmake ..
     make -j 4
 
-## Starting Servers
+## Connecting client to the server
+
+## Fedn Studio
+If you want to connect your client to your Studio project, update the `client.yaml` file located in the base directory of `fedn-cpp-client` with the following content: 
+
+```yaml
+discover_host: api.fedn.scaleoutsystems.com/test-sad-reducer
+name: client-cpp
+token: eNiIsInR5cCI6IkpXVCJ9eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTcpRNvxypK9T8fOTVRdmkfcKYtlHG9U95AyzJe7O1Pshs 
+client_id: c2580eca-6a75-49f8-a0a5-4bd97bfa4a37
+package: local
+```
+Replace the values based on your Studio's project settings. You can find this information in the `Connect Client` section under the `Clients` tab.
+
+### Local Servers
 **Note:** This section is only necessary if you are deploying FEDn locally. Skip this section if you are using Studio.
 
 This is a prototype and certain configurations (such as client name and combiner assignment) has been hardcoded for the pseudo-distributed docker compose setup in FEDn. We will be using a compute package written in python, there will not be any ML updates to models on the C++ client, instead it will just reupload the same global model weights. Validation is also not included (not implemented yet).
@@ -107,7 +123,7 @@ You can now check the model trail through the Python APIClient, the length of th
 ## Tear down
 Close C++ client with Ctrl+C
 
-Stop services:
+Stop local services (This step is not applicable if you are using FEDn Studio.):
 
     cd fedn/examples/mnist-pytorch
     docker-compose -f ../../docker-compose.yaml -f docker-compose.override.yaml down -v
