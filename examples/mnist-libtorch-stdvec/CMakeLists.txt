@@ -112,10 +112,10 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L<path-to-libomp-lib>")
 find_package(Armadillo REQUIRED)
 
 # Add mnist-libtorch as an executable
-add_executable(mnist-libtorch "mnist-libtorch.cpp")
+add_executable(mnist-libtorch-stdvec "mnist-libtorch-stdvec.cpp")
 
 # Link the executable with libraries
-target_link_libraries(mnist-libtorch PUBLIC
+target_link_libraries(mnist-libtorch-stdvec PUBLIC
   fednlib
   fedn_grpc_proto
   nlohmann_json::nlohmann_json
