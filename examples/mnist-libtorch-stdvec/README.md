@@ -107,7 +107,11 @@ This message should now be printed to the terminal once every few seconds:
 
     Response: Heartbeat received
 
-The client is then waiting for model update requests from the combiner. **Start** a training session either via the Studio dashboard or the Python APIClient. The expected output should look similar to this:
+The client is then waiting for model update requests from the combiner. **Start** a training session either via the Studio dashboard or the Python APIClient. 
+
+**Note:** When starting a session you need to set the helper type to `"binaryhelper"` to enable aggregation on the server side for models saved in `.bin` format!
+
+The expected output should look similar to this:
 
     Response: Heartbeat received
     Download in progress: 7bc93a97-0f11-468a-a272-ba0cd96685bf
