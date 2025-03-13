@@ -318,6 +318,13 @@ public:
 };
 
 int main(int argc, char** argv) {
+    // Create a new instance of the Net model
+    Net model;
+
+    // Save the model parameters to ../seed.bin
+    std::string seed_path = "../seed.bin";
+    saveParameters(model, seed_path);
+
     FednClient client("../../../client.yaml");
 
     std::map<std::string, std::string> combinerConfig = client.getCombinerConfig();

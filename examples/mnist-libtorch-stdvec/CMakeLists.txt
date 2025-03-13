@@ -21,7 +21,7 @@ include_directories(${YAML_CPP_INCLUDE_DIRS})
 # Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
 option(protobuf_MODULE_COMPATIBLE TRUE)
 # Set CMAKE_PREFIX_PATH to the directory containing protobuf-config.cmake
-set(CMAKE_PREFIX_PATH "~/.local/lib/cmake/")
+set(CMAKE_PREFIX_PATH "<path-to-protobuf-cmake>")
 find_package(Protobuf CONFIG REQUIRED)
 message(STATUS "Using protobuf ${Protobuf_VERSION}")
 
@@ -47,11 +47,11 @@ endif()
 
 # If using Armadillo
 # Ensure that Armadillo is installed on the system
-set(ARMADILLO_LIBRARY "/opt/homebrew/Cellar/armadillo/14.0.2_1")
-set(ARMADILLO_INCLUDE_DIR "/opt/homebrew/opt/armadillo/include")
-set(ARMADILLO_INCLUDE_DIRS "/usr/include")
+set(ARMADILLO_LIBRARY "<path-to-armadillo-lib>")
+set(ARMADILLO_INCLUDE_DIR "<path-to-armadillo-include>")
+set(ARMADILLO_INCLUDE_DIRS "<path-to-armadillo-include-dirs>")
 
-link_directories(/opt/homebrew/opt/armadillo/lib)
+link_directories(<path-to-armadillo-lib>)
 
 # Proto file for project
 get_filename_component(fedn_proto "../../src/protos/fedn.proto" ABSOLUTE)
@@ -113,9 +113,9 @@ find_package(Torch REQUIRED)
 # Include LibTorch headers
 include_directories(${TORCH_INCLUDE_DIRS})
 
-set(CMAKE_BUILD_RPATH "<path-to-libtorch>/lib")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I/opt/homebrew/opt/libomp/include")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/homebrew/opt/libomp/lib")
+set(CMAKE_BUILD_RPATH "<path-to-libomp-lib>;<path-to-libtorch-lib>")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I<path-to-libomp-include>")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L<path-to-libomp-lib>")
 
 find_package(Armadillo REQUIRED)
 
