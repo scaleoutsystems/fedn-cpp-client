@@ -31,6 +31,12 @@
 *.out
 *.app
 
+# model files
+*.bin
+*.npz
+
 # Build folders
 _build
-build
+**/build
+**/data
+
