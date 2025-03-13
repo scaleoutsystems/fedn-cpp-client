@@ -91,9 +91,9 @@ Now lets connect your client to your Studio project, update the `client.yaml` fi
 
 ```yaml
 discover_host: api.fedn.scaleoutsystems.com/test-sad-reducer
-name: client-cpp
-token: eNiIsInR5cCI6IkpXVCJ9eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTcpRNvxypK9T8fOTVRdmkfcKYtlHG9U95AyzJe7O1Pshs 
-client_id: c2580eca-6a75-49f8-a0a5-4bd97bfa4a37
+name: mnist-client-cpp
+token: <project-based-client-token>
+client_id: <unique-client-id>
 package: local
 ```
 Replace the values based on your Studio's project settings. You can find this information in the `Connect Client` section under the `Clients` tab.
