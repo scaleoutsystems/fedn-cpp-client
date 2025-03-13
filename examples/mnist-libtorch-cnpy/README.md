@@ -4,10 +4,10 @@ A FEDn client
 **Note:** This is a prototype and is still in active development, so the interface may change frequently. The purpose of this prototype is to demonstrate a full client implementation that allows clients written in different languages to jointly train a global model.
 
 ## fednlib API
-To create a FEDn client in C++, the user creates a C++ source file where they implement their machine learning code and use the FEDn library API `fednlib` to connect the client to the federated network. The `examples` folder contains code that showcases how to use the `fednlib` API to connect a client to a combiner and process task requests such as training and validation. The `mnist-libtorch` example trains a simple neural network with libtorch (C++ interface to PyTorch) and libcnpy (C++ interface to numpy) to solve the MNIST classification problem and gives a more concrete example of how to implement C++ machine learning code with FEDn.
+To create a FEDn client in C++, the user creates a C++ source file where they implement their machine learning code and use the FEDn library API `fednlib` to connect the client to the federated network. The `examples` folder contains code that showcases how to use the `fednlib` API to connect a client to a combiner and process task requests such as training and validation. The `mnist-libtorch-cnpy` example trains a simple neural network with libtorch (C++ interface to PyTorch) and libcnpy (C++ interface to numpy) to solve the MNIST classification problem and gives a more concrete example of how to implement C++ machine learning code with FEDn.
 
-* `train`: The user starts by reading the model from a binary file into the preferred format (depending on the ML library that is used), implements the machine learning logic, and saves the updated model back to a file in binary format. In the example `mnist_client.cpp`, this function simply reads the global model into memory, start the training using `libtorch` and writes it back to file.
-* `validate`: The user starts by reading the model from a binary file, computes the preferred validation metrics, saves the metrics in a JSON object and writes the JSON to file. In the example `mnist_client.cpp`, this function creates a JSON with validation data and writes it to file.
+* `train`: The user starts by reading the model from a binary file into the preferred format (depending on the ML library that is used), implements the machine learning logic, and saves the updated model back to a file in binary format. In the example `mnist_client-cnpy.cpp`, this function simply reads the global model into memory, start the training using `libtorch` and writes it back to file.
+* `validate`: The user starts by reading the model from a binary file, computes the preferred validation metrics, saves the metrics in a JSON object and writes the JSON to file. In the example `mnist_client-cnpy.cpp`, this function creates a JSON with validation data and writes it to file.
 * `main`: The user starts by creating an object of the class `FednClient`, passing the client configuration file path to the constructor. Then the user gets the combiner configuration from the `FednClient` object and uses it to setup a gRPC channel. Then the user creates an object of the custom class which inherits from `GrpcCient` and overrides the functions `train` and `validate` as described above, passing the gRPC channel to the constructor. Finally the user invokes the `run` method on the `FednClient` object to connect the client to the task stream from the assigned combiner.
 
 **NOTE**: This example is designed to work only with the following neural network architecture: 
@@ -75,19 +75,19 @@ https://github.com/rogersce/cnpy
 Once installed, make sure to set the correct paths in the `CMakeLists.txt` file.
 
 #### Build the client executable
-Now that the libraries are installed, we can build the client executable. Here we show how to build the example client `mnist-client`. Ensure that all paths specified in the `CMakeLists.txt` file are correct.:
+Now that the libraries are installed, we can build the client executable. Here we show how to build the example client `mnist-client-cnpy`. Ensure that all paths specified in the `CMakeLists.txt` file are correct.:
 
     mkdir -p build
     cd build
     cmake ..
     make -j 4
 
-After the last command you should have `mnist-client` executable ready to use. 
+After the last command you should have `mnist-client-cnpy` executable ready to use. 
 
 ## Connecting client to the server
 
 ## Fedn Studio
-Now lets connect your client to your Studio project, update the `client.yaml` file located in the base directory of `fedn-cpp-client` with the following content: 
+Now lets connect your client to your Studio project, update the `client.yaml` file located in the base directory of `fedn-cpp-client-cnpy` with the following content: 
 
 ```yaml
 discover_host: api.fedn.scaleoutsystems.com/test-sad-reducer
@@ -99,15 +99,15 @@ package: local
 Replace the values based on your Studio's project settings. You can find this information in the `Connect Client` section under the `Clients` tab.
 
 ## Dataset for the client
-For this demo example, we have created an object-store bucket and placed a small dataset in it. The function `downloadMNISTData` in `mnist-client.cpp` contains the implementation. You can modify the function to access additional or different partitions of the dataset. 
+For this demo example, we have created an object-store bucket and placed a small dataset in it. The function `downloadMNISTData` in `mnist-client-cnpy.cpp` contains the implementation. You can modify the function to access additional or different partitions of the dataset. 
 
 ## Seed model
-The seed model needs to be uploaded to the Studio before starting the training. It can be generated using either the C++ or Python client. On the start of the C++ client it generated the seed model (`seed.npz`) in the `mnist-client` directory. 
+The seed model needs to be uploaded to the Studio before starting the training. It can be generated using either the C++ or Python client. On the start of the C++ client it generated the seed model (`seed.npz`) in the `mnist-client-cnpy` directory. 
 
 ## Start the C++ client
-Standing in `mnist-client/build`, run the following command:
+Standing in `mnist-client-cnpy/build`, run the following command:
 
-    ./mnist-client
+    ./mnist-client-cnpy
 
 **Note:** You can change the name of the client executable in the `CMakeLists.txt` file for your client.
 
