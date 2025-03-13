@@ -45,14 +45,6 @@ else()
 set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 endif()
 
-# If using Armadillo
-# Ensure that Armadillo is installed on the system
-set(ARMADILLO_LIBRARY "<path-to-armadillo-lib>")
-set(ARMADILLO_INCLUDE_DIR "<path-to-armadillo-include>")
-set(ARMADILLO_INCLUDE_DIRS "<path-to-armadillo-include-dirs>")
-
-link_directories(<path-to-armadillo-lib>)
-
 # Proto file for project
 get_filename_component(fedn_proto "../../src/protos/fedn.proto" ABSOLUTE)
 get_filename_component(fedn_proto_path "${fedn_proto}" PATH)
@@ -128,7 +120,6 @@ target_link_libraries(mnist-libtorch PUBLIC
   fedn_grpc_proto
   nlohmann_json::nlohmann_json
   ${TORCH_LIBRARIES} 
-  armadillo
   yaml-cpp
   CURL::libcurl
 )
