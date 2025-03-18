@@ -466,7 +466,6 @@ void GrpcClient::train(const std::string& inModelPath, const std::string& outMod
     // Using own code to save the matrix as a binary file, dymmy code. Remove if using Armadillo
     saveModelToFile(modelUpdateData, outModelPath);
 }
-
 /**
  * @brief Updates the local model by downloading it from the server, training it, and uploading the updated model back to the server.
  * 
@@ -486,25 +485,31 @@ void GrpcClient::train(const std::string& inModelPath, const std::string& outMod
 void GrpcClient::updateLocalModel(const std::string& modelID, const std::string& requestData) {
     std::cout << "Updating local model: " << modelID << std::endl;
 
-    // Stream model and write it to file
-    downloadModelToFile(modelID, std::string("./") + modelID + std::string(".bin"));
-
-    // Create random UUID4 for model update
+    // Generate random UUIDs for temporary files
+    std::string tempModelFile = generateRandomUUID();
     std::string modelUpdateID = generateRandomUUID();
+    
+    // Create file paths
+    std::string inModelPath = "./" + tempModelFile + ".bin";
+    std::string outModelPath = "./" + modelUpdateID + ".bin";
+
+    // Stream model and write it to file
+    downloadModelToFile(modelID, inModelPath);
+
     std::cout << "Generated random UUID " << modelUpdateID << " for model update" << std::endl;
 
     // train the model
-    this->train(std::string("./") + modelID + std::string(".bin"), std::string("./") + modelUpdateID + std::string(".bin"));
+    this->train(inModelPath, outModelPath);
 
     std::cout << "Streaming model from file: " << modelUpdateID << std::endl;
-    GrpcClient::uploadModelFromFile(modelUpdateID, std::string("./") + modelUpdateID + std::string(".bin"));
+    GrpcClient::uploadModelFromFile(modelUpdateID, outModelPath);
 
     // Send model update response to server
     GrpcClient::sendModelUpdate(modelID, modelUpdateID, requestData);
 
     // Delete model from disk
-    deleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
-    deleteFileFromDisk(std::string("./") + modelUpdateID + std::string(".bin"));
+    deleteFileFromDisk(inModelPath);
+    deleteFileFromDisk(outModelPath);
 }
 
 /**
@@ -543,13 +548,19 @@ void GrpcClient::validate(const std::string& inModelPath, const std::string& out
 void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& requestData) {
     std::cout << "Validating global model: " << modelID << std::endl;
 
-    // Stream model to file
-    downloadModelToFile(modelID, std::string("./") + modelID + std::string(".bin"));
+    // Generate random UUIDs for temporary files
+    std::string tempModelFile = generateRandomUUID();
+    std::string tempMetricFile = generateRandomUUID();
+    
+    // Create file paths
+    std::string modelPath = "./" + tempModelFile + ".bin";
+    std::string metricPath = "./" + tempMetricFile + ".json";
 
-    const std::string metricPath = std::string("./") + modelID + std::string(".json");
+    // Stream model to file
+    downloadModelToFile(modelID, modelPath);
 
     // validate the model
-    this->validate(std::string("./") + modelID + std::string(".bin"), metricPath);
+    this->validate(modelPath, metricPath);
 
     // Read the metric file from disk
     std::cout << "Loading metric from file: " << metricPath << std::endl;
@@ -558,10 +569,9 @@ void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& re
     // Send model validation response to server
     GrpcClient::sendModelValidation(modelID, metricData, requestData);
 
-    // Delete metrics file from disk
+    // Delete temporary files from disk
     deleteFileFromDisk(metricPath);
-    // Delete model from disk
-    deleteFileFromDisk(std::string("./") + modelID + std::string(".bin"));
+    deleteFileFromDisk(modelPath);
 }
 
 /**
@@ -602,9 +612,13 @@ void GrpcClient::predict(const std::string& modelPath, const std::string& output
  * @param requestData The task request data to be sent along with the prediction results.
  */
 void GrpcClient::predictGlobalModel(const std::string& modelID, TaskRequest& requestData) {
-    // File paths for model and prediction data
-    const std::string modelPath = std::string("./") + modelID + std::string(".bin");
-    const std::string predictionPath = std::string("./") + modelID + std::string("-out.json");
+    // Generate random UUIDs for temporary files
+    std::string tempModelFile = generateRandomUUID();
+    std::string tempPredictionFile = generateRandomUUID();
+    
+    // Create file paths
+    std::string modelPath = "./" + tempModelFile + ".bin";
+    std::string predictionPath = "./" + tempPredictionFile + ".json";
 
     // Stream model to file
     downloadModelToFile(modelID, modelPath);
@@ -619,7 +633,7 @@ void GrpcClient::predictGlobalModel(const std::string& modelID, TaskRequest& req
     // Send model prediction response to server
     GrpcClient::sendModelPrediction(modelID, predictionData, requestData);
 
-    // Delete model and output from disk
+    // Delete temporary files from disk
     deleteFileFromDisk(modelPath);
     deleteFileFromDisk(predictionPath);
 }
