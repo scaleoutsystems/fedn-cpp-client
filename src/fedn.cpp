@@ -56,6 +56,14 @@ private:
 FednClient::FednClient(std::string configFilePath) {
     // Read HTTP configuration from the "client.yaml" file
     YAML::Node config = YAML::LoadFile(configFilePath);
+    //TODO: make utility function instead
+    if (config.IsNull()) {
+        throw std::runtime_error("Failed to load configuration file: " + configFilePath);
+    } else {
+        std::cout << "Configuration file loaded successfully: " << configFilePath << std::endl;
+        std::cout << "Configuration contents: " << std::endl;
+        std::cout << config << std::endl;
+    }
     controllerConfig = readControllerConfig(config);
     combinerConfig = readCombinerConfig(config);
 

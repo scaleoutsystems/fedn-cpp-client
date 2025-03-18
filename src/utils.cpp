@@ -204,29 +204,43 @@ std::string generateRandomUUID() {
  */
 std::map<std::string, std::string> readCombinerConfig(YAML::Node configFile) {
     // Read HTTP configuration from the "client.yaml" file
+    std::cout << "Reading combiner configuration from config file" << std::endl;
     std::map<std::string, std::string> combinerConfig;
 
     if (configFile["combiner"]) {
         combinerConfig["host"] = configFile["combiner"].as<std::string>();
     }
+    else {
+       std::cout << "Combiner host not found in config, using default none" << std::endl;
+    }
     if (configFile["proxy_server"]) {
         combinerConfig["proxy_host"] = configFile["proxy_server"].as<std::string>();
+    }
+    else {
+        std::cout << "Proxy server not found in config, using default none" << std::endl;
     }
     if (configFile["insecure"]) {
         combinerConfig["insecure"] = configFile["insecure"].as<std::string>();
     }
     else {
+        std::cout << "Insecure not found in config, using default false" << std::endl;
         combinerConfig["insecure"] = "false";
     }
     if (configFile["token"]) {
         combinerConfig["token"] = configFile["token"].as<std::string>();
     }
+    else {
+        std::cout << "Token not found in config, using default empty string" << std::endl;
+        combinerConfig["token"] = "";
+    }
     if (configFile["auth_scheme"]) {
         combinerConfig["auth_scheme"] = configFile["auth_scheme"].as<std::string>();
     }
     else {
+        std::cout << "Auth scheme not found in config, using default Bearer" << std::endl;
         combinerConfig["auth_scheme"] = "Bearer";
     }
+    std::cout << "Combiner configuration read successfully" << std::endl;
 
     return combinerConfig;
 }
@@ -252,6 +266,7 @@ std::map<std::string, std::string> readControllerConfig(YAML::Node config) {
         controllerConfig["insecure"] = config["insecure"].as<std::string>();
     }
     else {
+        std::cout << "Insecure not found in config, using default false" << std::endl;
         controllerConfig["insecure"] = "false";
     }
 
@@ -273,11 +288,22 @@ std::map<std::string, std::string> readControllerConfig(YAML::Node config) {
     }
     controllerConfig["token"] = token;
 
-    controllerConfig["client_id"] = config["client_id"].as<std::string>();
-    controllerConfig["name"] = config["name"].as<std::string>();
+    if (config["client_id"]) {
+        controllerConfig["client_id"] = config["client_id"].as<std::string>();
+    }
+    else {
+        throw std::runtime_error("client_id key not found in config.");
+    }
+    if (config["name"]) {
+        controllerConfig["name"] = config["name"].as<std::string>();
+    }
+    else {
+        throw std::runtime_error("name key not found in config.");
+    }
     if (config["package"]) {
         controllerConfig["package"] = config["package"].as<std::string>();
     } else {
+        std::cout << "Package not found in config, using default remote" << std::endl;
         controllerConfig["package"] = "remote";
     }
     
@@ -285,8 +311,10 @@ std::map<std::string, std::string> readControllerConfig(YAML::Node config) {
     if (config["preferred_combiner"]) {
         controllerConfig["preferred_combiner"] = config["preferred_combiner"].as<std::string>();
     } else {
+        std::cout << "Preferred combiner not found in config, using default None" << std::endl;
         controllerConfig["preferred_combiner"] = "";
     }
+    std::cout << "HTTP request data read successfully" << std::endl;
 
     return controllerConfig;
 }
