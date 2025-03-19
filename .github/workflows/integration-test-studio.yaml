@@ -1,0 +1,115 @@
+name: CI Test Against Studio
+
+on:
+  schedule:
+    - cron: '0 2 * * 1-5' # Run every weekday at 2:00 AM
+  workflow_dispatch:
+    inputs:
+      FEDN_EXAMPLE:
+        description: 'FEDN Example'
+        required: false
+        default: 'my-client'
+      FEDN_NR_CLIENTS:
+        description: 'Number of Clients'
+        required: false
+        default: '2'
+      FEDN_NR_ROUNDS:
+        description: 'Number of Rounds'
+        required: false
+        default: '5'
+      FEDN_ROUND_TIMEOUT:
+        description: 'Round Timeout'
+        required: false
+        default: '180'
+      FEDN_BUFFER_SIZE:
+        description: 'Buffer Size'
+        required: false
+        default: '-1'
+      FEDN_FL_ALG:
+        description: 'FL Algorithm'
+        required: false
+        default: 'fedavg'
+      FEDN_NR_EXPECTED_AGG:
+        description: 'Number of Expected Aggregations Per Round'
+        required: false
+        default: '2'
+      FEDN_SESSION_TIMEOUT:
+        description: 'Session Timeout'
+        required: false
+        default: '420'
+      FEDN_SESSION_NAME:
+        description: 'Session Name'
+        required: false
+        default: 'test'
+      FEDN_CLIENT_TIMEOUT:
+        description: 'Client Connection Timeout (OBS - not related to round timeout)'
+        required: false
+        default: '420'
+
+jobs:
+  ci-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Generate .env file
+      run: |
+        echo "STUDIO_HOST=api.studio.scaleoutplatform.com" > .ci/tests/studio/.env
+        echo "STUDIO_USER=github@scaleoutsystems.com" >> .ci/tests/studio/.env
+        echo "FEDN_EXAMPLE=${{ github.event.inputs.FEDN_EXAMPLE || 'mnist-pytorch' }}" >> .ci/tests/studio/.env
+        echo "FEDN_NR_CLIENTS=${{ github.event.inputs.FEDN_NR_CLIENTS || '2' }}" >> .ci/tests/studio/.env
+        echo "FEDN_NR_ROUNDS=${{ github.event.inputs.FEDN_NR_ROUNDS || '5' }}" >> .ci/tests/studio/.env
+        echo "FEDN_ROUND_TIMEOUT=${{ github.event.inputs.FEDN_ROUND_TIMEOUT || '180' }}" >> .ci/tests/studio/.env
+        echo "FEDN_BUFFER_SIZE=${{ github.event.inputs.FEDN_BUFFER_SIZE || '-1' }}" >> .ci/tests/studio/.env
+        echo "FEDN_FL_ALG=${{ github.event.inputs.FEDN_FL_ALG || 'fedavg' }}" >> .ci/tests/studio/.env
+        echo "FEDN_NR_EXPECTED_AGG=${{ github.event.inputs.FEDN_NR_EXPECTED_AGG || '2' }}" >> .ci/tests/studio/.env
+        echo "FEDN_SESSION_TIMEOUT=${{ github.event.inputs.FEDN_SESSION_TIMEOUT || '420' }}" >> .ci/tests/studio/.env
+        echo "FEDN_SESSION_NAME=${{ github.event.inputs.FEDN_SESSION_NAME || 'test' }}" >> .ci/tests/studio/.env
+        echo "FEDN_CLIENT_TIMEOUT=${{ github.event.inputs.FEDN_CLIENT_TIMEOUT || '420' }}" >> .ci/tests/studio/.env
+
+    - name: Set GRPC_INSTALL_DIR
+      run: export PATH="$HOME/.local/bin:$PATH"
+
+    - name: Make build_example.sh executable
+      run: chmod +x .ci/studio/build_example.sh
+
+    - name: Build example
+      run: .ci/studio/build_example.sh
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install -r .ci/studio/requirements.txt
+
+    - name: Make studio.sh executable
+      run: chmod +x .ci/studio/studio.sh
+
+    - name: Run studio.sh
+      env:
+        STUDIO_PASSWORD: ${{ secrets.STUDIO_GITHUB_PASSWORD }}
+      run: |
+        source venv/bin/activate
+        .ci/studio/studio.sh
+
+    - name: Cleanup
+      run: |
+        rm -rf build
+        rm -rf examples/$FEDN_EXAMPLE/build
+        rm -rf venv
+        rm -f .ci/tests/studio/.env
+    
+    - name: Print test logs
+      if: failure()
+      run: |
+        for log in test_*.log; do
+              echo "Printing $log"
+              cat $log
+            done
