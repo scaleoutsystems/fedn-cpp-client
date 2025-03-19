@@ -40,3 +40,7 @@ _build
 **/build
 **/data
 
+#venvs
+.venv
+.env
+

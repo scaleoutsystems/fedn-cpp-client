@@ -60,7 +60,8 @@ public:
 };
 
 int main(int argc, char** argv) {
-    FednClient client("../../../client.yaml");
+    std::string configPath = (argc > 1) ? argv[1] : "../../../client.yaml";
+    FednClient client(configPath);
 
     std::map<std::string, std::string> combinerConfig = client.getCombinerConfig();
 
