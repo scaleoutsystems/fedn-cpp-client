@@ -56,18 +56,18 @@ jobs:
 
     - name: Generate .env file
       run: |
-        echo "STUDIO_HOST=api.studio.scaleoutplatform.com" > .ci/tests/studio/.env
-        echo "STUDIO_USER=github@scaleoutsystems.com" >> .ci/tests/studio/.env
-        echo "FEDN_EXAMPLE=${{ github.event.inputs.FEDN_EXAMPLE || 'mnist-pytorch' }}" >> .ci/tests/studio/.env
-        echo "FEDN_NR_CLIENTS=${{ github.event.inputs.FEDN_NR_CLIENTS || '2' }}" >> .ci/tests/studio/.env
-        echo "FEDN_NR_ROUNDS=${{ github.event.inputs.FEDN_NR_ROUNDS || '5' }}" >> .ci/tests/studio/.env
-        echo "FEDN_ROUND_TIMEOUT=${{ github.event.inputs.FEDN_ROUND_TIMEOUT || '180' }}" >> .ci/tests/studio/.env
-        echo "FEDN_BUFFER_SIZE=${{ github.event.inputs.FEDN_BUFFER_SIZE || '-1' }}" >> .ci/tests/studio/.env
-        echo "FEDN_FL_ALG=${{ github.event.inputs.FEDN_FL_ALG || 'fedavg' }}" >> .ci/tests/studio/.env
-        echo "FEDN_NR_EXPECTED_AGG=${{ github.event.inputs.FEDN_NR_EXPECTED_AGG || '2' }}" >> .ci/tests/studio/.env
-        echo "FEDN_SESSION_TIMEOUT=${{ github.event.inputs.FEDN_SESSION_TIMEOUT || '420' }}" >> .ci/tests/studio/.env
-        echo "FEDN_SESSION_NAME=${{ github.event.inputs.FEDN_SESSION_NAME || 'test' }}" >> .ci/tests/studio/.env
-        echo "FEDN_CLIENT_TIMEOUT=${{ github.event.inputs.FEDN_CLIENT_TIMEOUT || '420' }}" >> .ci/tests/studio/.env
+        echo "STUDIO_HOST=api.studio.scaleoutplatform.com" > .ci/studio/.env
+        echo "STUDIO_USER=github@scaleoutsystems.com" >> .ci/studio/.env
+        echo "FEDN_EXAMPLE=${{ github.event.inputs.FEDN_EXAMPLE || 'mnist-pytorch' }}" >> .ci/studio/.env
+        echo "FEDN_NR_CLIENTS=${{ github.event.inputs.FEDN_NR_CLIENTS || '2' }}" >> .ci/studio/.env
+        echo "FEDN_NR_ROUNDS=${{ github.event.inputs.FEDN_NR_ROUNDS || '5' }}" >> .ci/studio/.env
+        echo "FEDN_ROUND_TIMEOUT=${{ github.event.inputs.FEDN_ROUND_TIMEOUT || '180' }}" >> .ci/studio/.env
+        echo "FEDN_BUFFER_SIZE=${{ github.event.inputs.FEDN_BUFFER_SIZE || '-1' }}" >> .ci/studio/.env
+        echo "FEDN_FL_ALG=${{ github.event.inputs.FEDN_FL_ALG || 'fedavg' }}" >> .ci/studio/.env
+        echo "FEDN_NR_EXPECTED_AGG=${{ github.event.inputs.FEDN_NR_EXPECTED_AGG || '2' }}" >> .ci/studio/.env
+        echo "FEDN_SESSION_TIMEOUT=${{ github.event.inputs.FEDN_SESSION_TIMEOUT || '420' }}" >> .ci/studio/.env
+        echo "FEDN_SESSION_NAME=${{ github.event.inputs.FEDN_SESSION_NAME || 'test' }}" >> .ci/studio/.env
+        echo "FEDN_CLIENT_TIMEOUT=${{ github.event.inputs.FEDN_CLIENT_TIMEOUT || '420' }}" >> .ci/studio/.env
 
     - name: Set GRPC_INSTALL_DIR
       run: export PATH="$HOME/.local/bin:$PATH"
@@ -104,7 +104,7 @@ jobs:
         rm -rf build
         rm -rf examples/$FEDN_EXAMPLE/build
         rm -rf venv
-        rm -f .ci/tests/studio/.env
+        rm -f .ci/studio/.env
     
     - name: Print test logs
       if: failure()
