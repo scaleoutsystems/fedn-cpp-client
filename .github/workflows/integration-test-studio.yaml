@@ -58,7 +58,7 @@ jobs:
       run: |
         echo "STUDIO_HOST=api.studio.scaleoutplatform.com" > .ci/studio/.env
         echo "STUDIO_USER=github@scaleoutsystems.com" >> .ci/studio/.env
-        echo "FEDN_EXAMPLE=${{ github.event.inputs.FEDN_EXAMPLE || 'mnist-pytorch' }}" >> .ci/studio/.env
+        echo "FEDN_EXAMPLE=${{ github.event.inputs.FEDN_EXAMPLE || 'my-client' }}" >> .ci/studio/.env
         echo "FEDN_NR_CLIENTS=${{ github.event.inputs.FEDN_NR_CLIENTS || '2' }}" >> .ci/studio/.env
         echo "FEDN_NR_ROUNDS=${{ github.event.inputs.FEDN_NR_ROUNDS || '5' }}" >> .ci/studio/.env
         echo "FEDN_ROUND_TIMEOUT=${{ github.event.inputs.FEDN_ROUND_TIMEOUT || '180' }}" >> .ci/studio/.env
