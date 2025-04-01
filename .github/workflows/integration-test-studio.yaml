@@ -76,6 +76,8 @@ jobs:
       run: chmod +x .ci/studio/build_example.sh
 
     - name: Build example
+      env:
+        FEDN_EXAMPLE: ${{ github.event.inputs.FEDN_EXAMPLE || 'my-client' }}
       run: .ci/studio/build_example.sh
 
     - name: Set up Python
