@@ -916,7 +916,7 @@ bool GrpcClient::sendModelMetrics(const std::map<std::string, float>& metrics,
     Client* client = modelMetric.mutable_sender();
     client->set_name(name);
     client->set_role(CLIENT);
-    client->set_client_id(id_);
+    client->set_client_id(client_id);
     modelMetric.set_model_id(modelID);
     modelMetric.set_round_id(roundID);
     modelMetric.set_session_id(sessionID);
