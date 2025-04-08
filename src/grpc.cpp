@@ -902,7 +902,7 @@ bool GrpcClient::log_metrics(const std::map<std::string, float>& metrics, const 
         loggingContext.incrementStep();
     }
 
-    return this->sendModelMetrics(metrics, this->name_, this->id_, modelId, sessionId, roundId, loggingStep);
+    return this->sendModelMetrics(metrics, this->name_, this->id_, modelId, roundId, sessionId, loggingStep);
 }
 
 bool GrpcClient::sendModelMetrics(const std::map<std::string, float>& metrics, 
@@ -921,6 +921,12 @@ bool GrpcClient::sendModelMetrics(const std::map<std::string, float>& metrics,
     modelMetric.set_round_id(roundID);
     modelMetric.set_session_id(sessionID);
     modelMetric.mutable_step()->set_value(step);
+
+    google::protobuf::Timestamp* timestamp = modelMetric.mutable_timestamp();
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    timestamp->set_seconds(now_c);
+    timestamp->set_nanos(0);
 
     for (const auto& metric : metrics) {
         auto* metricEntry = modelMetric.add_metrics();
