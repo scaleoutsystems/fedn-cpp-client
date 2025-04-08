@@ -1,7 +1,9 @@
 syntax = "proto3";
 
-package fedn; 
+package fedn;
+
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 
 message Response {
     Client sender = 1;
@@ -25,7 +27,7 @@ enum LogLevel {
       WARNING = 3;
       ERROR = 4;
       AUDIT = 5;
-}
+    }
 
 message Status {
     Client sender = 1;
@@ -49,6 +51,7 @@ message TaskRequest {
   Client sender = 1;
   Client receiver = 2;
   string model_id = 3;
+  // data is round_config when type is MODEL_UPDATE
   string data = 4;
   string correlation_id = 5;
   string timestamp = 6;
@@ -89,6 +92,22 @@ message ModelPrediction {
   string meta = 7;
   string prediction_id = 8;
 }
+
+message ModelMetric {
+  Client sender = 1;
+  repeated NamedMetric metrics = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  google.protobuf.UInt32Value step = 4;
+  string model_id = 5;
+  string round_id = 6;
+  string session_id = 7;
+}
+
+message NamedMetric {
+  string key = 1;
+  float value = 2;
+}
+
 
 enum ModelStatus {
   OK = 0;
@@ -132,6 +151,8 @@ message GetGlobalModelResponse {
 
 message Heartbeat {
   Client sender = 1;
+  float memory_utilisation = 2;
+  float cpu_utilisation = 3;
 }
 
 message ClientAvailableMessage {
@@ -205,6 +226,7 @@ service Control {
   rpc Stop(ControlRequest) returns (ControlResponse);
   rpc FlushAggregationQueue(ControlRequest) returns (ControlResponse);
   rpc SetAggregator(ControlRequest) returns (ControlResponse);
+  rpc SetServerFunctions(ControlRequest) returns (ControlResponse);
 }
 
 service Reducer {
@@ -242,16 +264,74 @@ service Connector {
 
     rpc ReassignClient (ReassignRequest) returns (Response);
     rpc ReconnectClient (ReconnectRequest) returns (Response);
+
+    rpc SendModelMetric(ModelMetric) returns (Response);
 }
 
 service Combiner {
-
     // Stream endpoints for training/validation pub/sub
     rpc TaskStream (ClientAvailableMessage) returns (stream TaskRequest);
 
     rpc SendModelUpdate (ModelUpdate) returns (Response);
     rpc SendModelValidation (ModelValidation) returns (Response);
     rpc SendModelPrediction (ModelPrediction) returns (Response);
-
 }
 
+message ProvidedFunctionsRequest {
+  string function_code = 1;
+}
+
+message ProvidedFunctionsResponse {
+  map<string, bool> available_functions = 1;
+}
+
+message ClientConfigRequest {
+  bytes data = 1;
+}
+
+message ClientConfigResponse {
+  string client_settings = 1;
+}
+
+message ClientSelectionRequest {
+  string client_ids = 1;
+}
+
+message ClientSelectionResponse {
+  string client_ids = 1;
+}
+
+message ClientMetaRequest {
+  string metadata = 1;
+  string client_id = 2;
+}
+
+message ClientMetaResponse {
+  string status = 1;
+}
+
+message StoreModelRequest {
+  bytes data = 1;
+  string id = 2;
+}
+
+message StoreModelResponse {
+  string status = 1;
+}
+
+message AggregationRequest {
+  string aggregate = 1;
+}
+
+message AggregationResponse {
+  bytes data = 1;
+}
+
+service FunctionService {
+  rpc HandleProvidedFunctions(ProvidedFunctionsRequest) returns (ProvidedFunctionsResponse);
+  rpc HandleClientConfig (stream ClientConfigRequest) returns (ClientConfigResponse);
+  rpc HandleClientSelection (ClientSelectionRequest) returns (ClientSelectionResponse);
+  rpc HandleMetadata (ClientMetaRequest) returns (ClientMetaResponse);
+  rpc HandleStoreModel (stream StoreModelRequest) returns (StoreModelResponse);
+  rpc HandleAggregation (AggregationRequest) returns (stream AggregationResponse);
+}
