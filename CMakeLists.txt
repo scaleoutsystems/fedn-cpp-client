@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(hw-cpp VERSION 1.0 DESCRIPTION "hw client in C++")
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Find required dependencies for HTTP client
 find_package(CURL REQUIRED)
 if(NOT CURL_FOUND)
@@ -135,3 +137,5 @@ target_include_directories(fednlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Include directories
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+
+
