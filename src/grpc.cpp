@@ -28,7 +28,7 @@ using fedn::ClientAvailableMessage;
 using fedn::CLIENT;
 using fedn::Response;
 using fedn::ModelMetric;
-using fedn::NamedMetric;
+using fedn::AttributeMessage;
 
 /**
  * @brief Constructs a new GrpcClient object.
@@ -889,7 +889,7 @@ void sendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
 }
 
 
-bool GrpcClient::log_metrics(const std::map<std::string, float>& metrics, const std::optional<int> step, const bool commit){
+bool GrpcClient::logMetrics(const std::map<std::string, float>& metrics, const std::optional<int> step, const bool commit){
     // Add step and commit information if provided
     if (step.has_value()) {
         loggingContext.setStep(step.value());
@@ -936,7 +936,7 @@ bool GrpcClient::sendModelMetrics(const std::map<std::string, float>& metrics,
 
     ClientContext context;
     Response response;
-    Status status = connectorStub_->SendModelMetric(&context, modelMetric, &response);
+    Status status = combinerStub_->SendModelMetric(&context, modelMetric, &response);
     std::cout << "sendModelMetrics: " << modelMetric.model_id() << std::endl;
 
     if (!status.ok()) {
@@ -950,6 +950,43 @@ bool GrpcClient::sendModelMetrics(const std::map<std::string, float>& metrics,
         std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
     }
     return true;
+}
+
+bool GrpcClient::logAttributes(const std::map<std::string, std::string>& attributes){
+    AttributeMessage attributeMessage;
+    Client* client = attributeMessage.mutable_sender();
+    client->set_name(name_);
+    client->set_role(CLIENT);
+    client->set_client_id(id_);
+
+    google::protobuf::Timestamp* timestamp = attributeMessage.mutable_timestamp();
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    timestamp->set_seconds(now_c);
+    timestamp->set_nanos(0);
+
+    for (const auto& attribute : attributes) {
+        auto* attributeEntry = attributeMessage.add_attributes();
+        attributeEntry->set_key(attribute.first);
+        attributeEntry->set_value(attribute.second);
+    }
+
+    ClientContext context;
+    Response response;
+    Status status = combinerStub_->SendAttributeMessage(&context, attributeMessage, &response);
+
+    if (!status.ok()) {
+        std::cout << "sendModelMetrics: failed" << std::endl;
+        std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+        std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
+        return false;
+    }
+    else {
+        std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
+    }
+    return true;
+
 }
 
 

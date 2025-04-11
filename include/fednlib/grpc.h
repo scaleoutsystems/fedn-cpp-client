@@ -65,7 +65,7 @@ public:
     void setName(const std::string& name);
     void setId(const std::string& id);
     void setChunkSize(std::size_t chunkSize);
-    bool log_metrics(const std::map<std::string, float>& metrics, const std::optional<int> step=std::nullopt, const bool commit=true);
+    bool logMetrics(const std::map<std::string, float>& metrics, const std::optional<int> step=std::nullopt, const bool commit=true);
     bool sendModelMetrics(const std::map<std::string, float>& metrics, 
         const std::string& name, 
         const std::string& client_id, 
@@ -73,6 +73,7 @@ public:
         const std::string& roundID, 
         const std::string& sessionID, 
         const int step);
+    bool logAttributes(const std::map<std::string, std::string>& attributes);
     size_t getChunkSize();
 
 private:
