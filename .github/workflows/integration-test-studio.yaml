@@ -48,7 +48,7 @@ on:
 
 jobs:
   ci-test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, cpp]
 
     steps:
     - name: Checkout code
