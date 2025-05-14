@@ -1,3 +1,6 @@
-discover_address: http://localhost:8092
+discover_host: localhost:8092
 name: test
 network_id: fedn_test_network
+client_id: fedn_test_client
+insecure: true
+package: "local"

@@ -42,4 +42,4 @@ for i in $(seq 0 $(($FEDN_NR_CLIENTS - 1))); do
     examples/$FEDN_EXAMPLE/build/$FEDN_EXAMPLE test_${i}.yaml > test_${i}.log 2>&1 & eval "PID${i}=$!"
 done
 sleep 5
-pytest .ci/studio/tests.py
+pytest .ci/studio/tests.py -x

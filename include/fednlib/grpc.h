@@ -16,7 +16,35 @@ using fedn::TaskRequest;
 
 using json = nlohmann::json;
 
+class LoggingContext {
+    private: 
+        std::string modelId;
+        std::string roundId;
+        std::string sessionId;
+        int step;
+    public:
+        LoggingContext(std::string modelId, std::string roundId, std::string sessionId, int step) : 
+            modelId(modelId), roundId(roundId), sessionId(sessionId), step(step) {}
+        LoggingContext(TaskRequest& requestData);
+        LoggingContext() = default;
+        std::string getModelId() { return modelId; }
+        std::string getRoundId() { return roundId; }
+        std::string getSessionId() { return sessionId; }
+        int getStep() { return step; }
+        void setStep(int step) { this->step = step; }
+        void incrementStep() { this->step++; }
+        void reset() { 
+            this->modelId = "";
+            this->roundId = "";
+            this->sessionId = "";
+            this->step = 0;
+        }
+};  
+
 class GrpcClient {
+private:
+    LoggingContext loggingContext;
+
 public:
     GrpcClient(std::shared_ptr<ChannelInterface> channel);
     void heartBeat();
@@ -37,6 +65,15 @@ public:
     void setName(const std::string& name);
     void setId(const std::string& id);
     void setChunkSize(std::size_t chunkSize);
+    bool logMetrics(const std::map<std::string, float>& metrics, const std::optional<int> step=std::nullopt, const bool commit=true);
+    bool sendModelMetrics(const std::map<std::string, float>& metrics, 
+        const std::string& name, 
+        const std::string& client_id, 
+        const std::string& modelID, 
+        const std::string& roundID, 
+        const std::string& sessionID, 
+        const int step);
+    bool logAttributes(const std::map<std::string, std::string>& attributes);
     size_t getChunkSize();
 
 private:

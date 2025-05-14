@@ -27,6 +27,8 @@ using fedn::Client;
 using fedn::ClientAvailableMessage;
 using fedn::CLIENT;
 using fedn::Response;
+using fedn::ModelMetric;
+using fedn::AttributeMessage;
 
 /**
  * @brief Constructs a new GrpcClient object.
@@ -43,6 +45,7 @@ GrpcClient::GrpcClient(std::shared_ptr<ChannelInterface> channel)
         modelserviceStub_(ModelService::NewStub(channel)) {
             this->setChunkSize(1024 * 1024);
         }
+        
 
 /**
  * @brief Sends a heartbeat message to the server.
@@ -73,7 +76,7 @@ void GrpcClient::heartBeat() {
     ClientContext context;
 
     // The actual RPC.
-    Status status = connectorStub_ ->SendHeartbeat(&context, request, &reply);
+    Status status = connectorStub_->SendHeartbeat(&context, request, &reply);
 
     // Print response attribute from fedn::Response
     std::cout << "Response: " << reply.response() << std::endl;
@@ -126,13 +129,19 @@ void GrpcClient::connectTaskStream() {
       std::cout << "TaskRequest ModelID: " << task.model_id() << std::endl;
       std::cout << "TaskRequest: TaskType:" << task.type() << std::endl;
       if (task.type() == StatusType::MODEL_UPDATE) {
+        this->loggingContext = LoggingContext(task);
         this->updateLocalModel(task.model_id(), task.data());
+        this->loggingContext.reset();
       }
       else if (task.type() == StatusType::MODEL_VALIDATION) {
+        this->loggingContext = LoggingContext(task);
         this->validateGlobalModel(task.model_id(), task);
+        this->loggingContext.reset();
       }
       else if (task.type() == StatusType::MODEL_PREDICTION) {
+        this->loggingContext = LoggingContext(task);
         this->predictGlobalModel(task.model_id(), task);
+        this->loggingContext.reset();
       }
       
     }
@@ -612,6 +621,8 @@ void GrpcClient::predict(const std::string& modelPath, const std::string& output
  * @param requestData The task request data to be sent along with the prediction results.
  */
 void GrpcClient::predictGlobalModel(const std::string& modelID, TaskRequest& requestData) {
+    
+
     // Generate random UUIDs for temporary files
     std::string tempModelFile = generateRandomUUID();
     std::string tempPredictionFile = generateRandomUUID();
@@ -774,6 +785,8 @@ void GrpcClient::sendModelPrediction(const std::string& modelID, json& predictio
     client.set_client_id(id_);
 
     ModelPrediction prediction;
+
+    // Pass ownership of client to protobuf message
     prediction.set_allocated_sender(&client);
     prediction.set_model_id(modelID);
     prediction.set_data(predictionData.dump());
@@ -809,8 +822,8 @@ void GrpcClient::sendModelPrediction(const std::string& modelID, json& predictio
     else {
       std::cout << "sendModelPrediction: Response: " << response.response() << std::endl;
     }
-    // Garbage collect the client object.
-    Client *clientCollect = prediction.release_sender();
+    // Get the ownership of the client object back so it is deleted correctly at end of scope
+    Client *clientCollect = prediction.release_sender();    
 }
 
 /**
@@ -873,4 +886,117 @@ void sendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
       client->heartBeat();
       std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
   }
+}
+
+
+bool GrpcClient::logMetrics(const std::map<std::string, float>& metrics, const std::optional<int> step, const bool commit){
+    // Add step and commit information if provided
+    if (step.has_value()) {
+        loggingContext.setStep(step.value());
+    }
+    std::string roundId = loggingContext.getRoundId();
+    std::string modelId = loggingContext.getModelId();
+    std::string sessionId = loggingContext.getSessionId();
+    int loggingStep = loggingContext.getStep();
+    if (commit){
+        loggingContext.incrementStep();
+    }
+
+    return this->sendModelMetrics(metrics, this->name_, this->id_, modelId, roundId, sessionId, loggingStep);
+}
+
+bool GrpcClient::sendModelMetrics(const std::map<std::string, float>& metrics, 
+        const std::string& name, 
+        const std::string& client_id, 
+        const std::string& modelID, 
+        const std::string& roundID, 
+        const std::string& sessionID, 
+        const int step){
+    ModelMetric modelMetric;
+    Client* client = modelMetric.mutable_sender();
+    client->set_name(name);
+    client->set_role(CLIENT);
+    client->set_client_id(client_id);
+    modelMetric.set_model_id(modelID);
+    modelMetric.set_round_id(roundID);
+    modelMetric.set_session_id(sessionID);
+    modelMetric.mutable_step()->set_value(step);
+
+    google::protobuf::Timestamp* timestamp = modelMetric.mutable_timestamp();
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    timestamp->set_seconds(now_c);
+    timestamp->set_nanos(0);
+
+    for (const auto& metric : metrics) {
+        auto* metricEntry = modelMetric.add_metrics();
+        metricEntry->set_key(metric.first);
+        metricEntry->set_value(metric.second);
+    }
+
+    ClientContext context;
+    Response response;
+    Status status = combinerStub_->SendModelMetric(&context, modelMetric, &response);
+    std::cout << "sendModelMetrics: " << modelMetric.model_id() << std::endl;
+
+    if (!status.ok()) {
+        std::cout << "sendModelMetrics: failed for model: " << modelID << std::endl;
+        std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+        std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
+        return false;
+    }
+    else {
+        std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
+    }
+    return true;
+}
+
+bool GrpcClient::logAttributes(const std::map<std::string, std::string>& attributes){
+    AttributeMessage attributeMessage;
+    Client* client = attributeMessage.mutable_sender();
+    client->set_name(name_);
+    client->set_role(CLIENT);
+    client->set_client_id(id_);
+
+    google::protobuf::Timestamp* timestamp = attributeMessage.mutable_timestamp();
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    timestamp->set_seconds(now_c);
+    timestamp->set_nanos(0);
+
+    for (const auto& attribute : attributes) {
+        auto* attributeEntry = attributeMessage.add_attributes();
+        attributeEntry->set_key(attribute.first);
+        attributeEntry->set_value(attribute.second);
+    }
+
+    ClientContext context;
+    Response response;
+    Status status = combinerStub_->SendAttributeMessage(&context, attributeMessage, &response);
+
+    if (!status.ok()) {
+        std::cout << "sendModelMetrics: failed" << std::endl;
+        std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+        std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
+        return false;
+    }
+    else {
+        std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
+    }
+    return true;
+
+}
+
+
+LoggingContext::LoggingContext(TaskRequest& requestData) {
+    this->sessionId = requestData.session_id();
+    this->modelId = requestData.model_id();
+    
+    if (requestData.type() == StatusType::MODEL_UPDATE) {
+        json roundData = json::parse(requestData.data());
+        this->roundId = roundData["round_id"];
+    }
+    this->step = 0;
 }

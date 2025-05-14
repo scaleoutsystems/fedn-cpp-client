@@ -1,4 +1,4 @@
-#include "../../include/fednlib.h"
+#include "fednlib.h"
 
 class CustomGrpcClient : public GrpcClient {
 public:
@@ -24,6 +24,10 @@ public:
         // Using own code to load the matrix from a binary file, dymmy code. Remove if using Armadillo
         std::cout << "USER-DEFINED CODE: Training model..." << std::endl;
         std::string modelData = loadModelFromFile(inModelPath);
+
+        this->logMetrics({{"train_loss", 0.2}, {"train_accuracy",0.5}});
+        this->logMetrics({{"train_loss", 0.04}, {"train_accuracy",0.95}});
+        
         
         // Send the same model back as update
         std::string modelUpdateData = modelData;
