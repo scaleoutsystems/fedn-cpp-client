@@ -25,8 +25,8 @@ public:
         std::cout << "USER-DEFINED CODE: Training model..." << std::endl;
         std::string modelData = loadModelFromFile(inModelPath);
 
-        this->log_metrics({{"train_loss", 0.2}, {"train_accuracy",0.5}});
-        this->log_metrics({{"train_loss", 0.04}, {"train_accuracy",0.95}});
+        this->logMetrics({{"train_loss", 0.2}, {"train_accuracy",0.5}});
+        this->logMetrics({{"train_loss", 0.04}, {"train_accuracy",0.95}});
         
         
         // Send the same model back as update

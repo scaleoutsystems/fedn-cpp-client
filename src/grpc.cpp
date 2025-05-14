@@ -76,7 +76,7 @@ void GrpcClient::heartBeat() {
     ClientContext context;
 
     // The actual RPC.
-    Status status = connectorStub_ ->SendHeartbeat(&context, request, &reply);
+    Status status = connectorStub_->SendHeartbeat(&context, request, &reply);
 
     // Print response attribute from fedn::Response
     std::cout << "Response: " << reply.response() << std::endl;
