@@ -29,7 +29,7 @@ using fedn::CLIENT;
 using fedn::Response;
 using fedn::ModelMetric;
 using fedn::AttributeMessage;
-
+using fedn::TelemetryMessage;
 /**
  * @brief Constructs a new GrpcClient object.
  * 
@@ -976,17 +976,52 @@ bool GrpcClient::logAttributes(const std::map<std::string, std::string>& attribu
     Status status = combinerStub_->SendAttributeMessage(&context, attributeMessage, &response);
 
     if (!status.ok()) {
-        std::cout << "sendModelMetrics: failed" << std::endl;
+        std::cout << "logAttributes: failed" << std::endl;
         std::cout << status.error_code() << ": " << status.error_message()
                 << std::endl;
-        std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
+        std::cout << "logAttributes: Response: " << response.response() << std::endl;
         return false;
     }
     else {
-        std::cout << "sendModelMetrics: Response: " << response.response() << std::endl;
+        std::cout << "logAttributes: Response: " << response.response() << std::endl;
     }
     return true;
+}
 
+bool GrpcClient::logTelemetry(const std::map<std::string, float>& telemetries){
+    TelemetryMessage telemetryMessage;
+    Client* client = telemetryMessage.mutable_sender();
+    client->set_name(name_);
+    client->set_role(CLIENT);
+    client->set_client_id(id_);
+
+    google::protobuf::Timestamp* timestamp = telemetryMessage.mutable_timestamp();
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    timestamp->set_seconds(now_c);
+    timestamp->set_nanos(0);
+
+    for (const auto& telemetry : telemetries) {
+        auto* telemetryEntry = telemetryMessage.add_telemetries();
+        telemetryEntry->set_key(telemetry.first);
+        telemetryEntry->set_value(telemetry.second);
+    }
+
+    ClientContext context;
+    Response response;
+    Status status = combinerStub_->SendTelemetryMessage(&context, telemetryMessage, &response);
+
+    if (!status.ok()) {
+        std::cout << "logTelemetry: failed" << std::endl;
+        std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+        std::cout << "logTelemetry: Response: " << response.response() << std::endl;
+        return false;
+    }
+    else {
+        std::cout << "logTelemetry: Response: " << response.response() << std::endl;
+    }
+    return true;
 }
 
 

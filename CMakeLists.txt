@@ -9,15 +9,12 @@ if(NOT CURL_FOUND)
     message(FATAL_ERROR "curl not found! Please set the path.")
 endif()
 
-set(YAML_CPP_DIR "<path-to-yaml-cpp>")
-find_package(yaml-cpp REQUIRED)
 
+
+find_package(yaml-cpp REQUIRED)
 if(NOT yaml-cpp_FOUND)
     message(FATAL_ERROR "yaml-cpp not found! Please set the path.")
 endif()
-
-include_directories(${YAML_CPP_DIR}/include)
-link_directories(${YAML_CPP_DIR}/lib)
 
 find_package(nlohmann_json REQUIRED)
 
@@ -25,7 +22,7 @@ if(NOT nlohmann_json_FOUND)
     message(FATAL_ERROR "nlohmann_json not found! Please set the path.")
 endif()
 
-include_directories(${YAML_CPP_INCLUDE_DIRS})
+
 
 # Protobuf and gRPC
 # This assumes that gRPC and all its dependencies are already installed
@@ -58,6 +55,8 @@ find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin)
 else()
 set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 endif()
+# Include gRPC headers
+include_directories(${gRPC_INCLUDE_DIRS})
 
 # Proto file for project
 get_filename_component(fedn_proto "src/protos/fedn.proto" ABSOLUTE)
@@ -98,7 +97,7 @@ target_link_libraries(fedn_grpc_proto
   ${_PROTOBUF_LIBPROTOBUF})
 
 # Include directories fednlib
-include_directories(include)
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Source files fednlib
 set(SOURCES
@@ -132,8 +131,15 @@ if(DEFINED ${ARMADILLO_LIBRARY})
 target_link_libraries(fednlib PRIVATE ${ARMADILLO_LIBRARY})
 endif()
 
+# Link yaml-cpp manually if INCLUDE_DIRS is not set
+# This stems from a bug in yaml-cpp's CMake configuration
+if("${yaml-cpp_INCLUDE_DIRS}" STREQUAL "")
+    target_include_directories(fednlib PUBLIC ${YAML_CPP_INCLUDE_DIR})
+    target_link_directories(fednlib PUBLIC ${YAML_CPP_LIBRARY_DIR})
+endif()
+
 # Link header files to fednlib
-target_include_directories(fednlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(fednlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/build)
 
 # Include directories
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
