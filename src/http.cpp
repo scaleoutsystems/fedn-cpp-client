@@ -102,6 +102,7 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     // Set the response data string as the write callback parameter
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseData);
 
+    std::cout << "Adding client with REST call to: " + addClientApiUrl << std::endl;
     // Perform the HTTP POST request
     CURLcode res = curl_easy_perform(curl);
 
