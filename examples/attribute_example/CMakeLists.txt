@@ -13,4 +13,4 @@ add_subdirectory(${FEDN_PROJECT_DIR} fednlib_build)
 add_executable(attribute_client main.cpp)
 
 # Link the example with the library
-target_link_libraries(my-example fednlib)
+target_link_libraries(attribute_client fednlib)
