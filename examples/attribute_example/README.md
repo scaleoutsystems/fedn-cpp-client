@@ -1,5 +1,5 @@
 # fedn cpp client for attribute example
-A FEDn client 
+A FEDn client used for showcasing attributes, metrics and telemetry for the C++ client. 
 
 **Note:** This is a prototype and is still in active development, so the interface may change frequently. The purpose of this prototype is to demonstrate a full client implementation that allows clients written in different languages to jointly train a global model.
 
