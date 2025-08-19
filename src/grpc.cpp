@@ -889,10 +889,10 @@ void sendIntervalHeartBeat(GrpcClient* client, int intervalSeconds) {
 }
 
 
-bool GrpcClient::logMetrics(const std::map<std::string, float>& metrics, const std::optional<int> step, const bool commit){
+bool GrpcClient::logMetrics(const std::map<std::string, float>& metrics, const int* step, const bool commit){
     // Add step and commit information if provided
-    if (step.has_value()) {
-        loggingContext.setStep(step.value());
+    if (step != nullptr) {
+        loggingContext.setStep(*step);
     }
     std::string roundId = loggingContext.getRoundId();
     std::string modelId = loggingContext.getModelId();
