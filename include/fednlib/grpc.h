@@ -65,7 +65,7 @@ public:
     void setName(const std::string& name);
     void setId(const std::string& id);
     void setChunkSize(std::size_t chunkSize);
-    bool logMetrics(const std::map<std::string, float>& metrics, const std::optional<int> step=std::nullopt, const bool commit=true);
+    bool logMetrics(const std::map<std::string, float>& metrics, const int* step=nullptr, const bool commit=true);
     bool sendModelMetrics(const std::map<std::string, float>& metrics, 
         const std::string& name, 
         const std::string& client_id, 
