@@ -73,6 +73,7 @@ public:
         const std::string& roundID, 
         const std::string& sessionID, 
         const int step);
+    bool logTelemetry(const std::map<std::string, float>& telemetries);
     bool logAttributes(const std::map<std::string, std::string>& attributes);
     size_t getChunkSize();
 
