@@ -1,6 +1,6 @@
-discover_host: localhost:8092
-name: test
-network_id: fedn_test_network
+discover_host: api.studio.scaleoutplatform.com/test-apj-fedn-reducer
+name: client-cpp
+token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU2NDU3MjM0LCJpYXQiOjE3NTM4NjUyMzQsImp0aSI6IjM2ZDFkYzI3ZjAwZTRkZDBiMDBiYzg3MTljOGM5ZjkxIiwidXNlcl9pZCI6NTgsImNyZWF0b3IiOiJzaWd2YXJkQHNjYWxlb3V0c3lzdGVtcy5jb20iLCJyb2xlIjoiY2xpZW50IiwicHJvamVjdF9zbHVnIjoidGVzdC1hcGoifQ.CyzZL6KRsTNu71ARJnpbjxFl6XxRE_sYVyRjHt6EttY"
 client_id: fedn_test_client
-insecure: true
+insecure: false
 package: "local"

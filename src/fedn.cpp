@@ -6,7 +6,12 @@
 #include "../include/fednlib/fedn.h"
 #include "../include/fednlib/utils.h"
 
+// Add the ClientOptions header
+#include "../include/fednlib/ClientOptions.hpp"
+
 using json = nlohmann::json;
+
+namespace fedn {
 
 class MyCustomAuthenticator : public grpc::MetadataCredentialsPlugin {
 public:
@@ -53,22 +58,58 @@ private:
  * 
  * @param configFilePath The path to the YAML configuration file.
  */
-FednClient::FednClient(std::string configFilePath) {
-    // Read HTTP configuration from the "client.yaml" file
-    YAML::Node config = YAML::LoadFile(configFilePath);
-    //TODO: make utility function instead
-    if (config.IsNull()) {
-        throw std::runtime_error("Failed to load configuration file: " + configFilePath);
-    } else {
-        std::cout << "Configuration file loaded successfully: " << configFilePath << std::endl;
-        std::cout << "Configuration contents: " << std::endl;
-        std::cout << config << std::endl;
-    }
+// FednClient::FednClient(std::string configFilePath) {
+//     // Read HTTP configuration from the "client.yaml" file
+//     YAML::Node config = YAML::LoadFile(configFilePath);
+//     //TODO: make utility function instead
+//     if (config.IsNull()) {
+//         throw std::runtime_error("Failed to load configuration file: " + configFilePath);
+//     } else {
+//         std::cout << "Configuration file loaded successfully: " << configFilePath << std::endl;
+//         std::cout << "Configuration contents: " << std::endl;
+//         std::cout << config << std::endl;
+//     }
+//     controllerConfig = readControllerConfig(config);
+//     combinerConfig = readCombinerConfig(config);
+
+//     // Create a Client instance with the API URL and token (if provided)
+//     httpClient = std::make_shared<HttpClient>(controllerConfig["api_url"], controllerConfig["token"]);
+// }
+FednClient::FednClient(const ClientOptions& opts) : opts_(opts) {
+    // create a in memory YAML to hold ClientOptions
+    std::cout << "### NEW ClientOptions constructor used ###\n";
+
+    YAML::Node config;
+    config["discover_host"] = opts.discover_host;
+    config["token"]         = opts.token;
+    config["name"]          = opts.name;
+    config["client_id"]     = std::to_string(opts.client_id);
+    config["insecure"]      = opts.insecure ? "true" : "false";
+    config["package"]       = opts.package;
+
+    // Continue as before, read the controller and combiner configurations
     controllerConfig = readControllerConfig(config);
     combinerConfig = readCombinerConfig(config);
 
     // Create a Client instance with the API URL and token (if provided)
     httpClient = std::make_shared<HttpClient>(controllerConfig["api_url"], controllerConfig["token"]);
+}
+
+
+class CustomGrpcClient;           // forward declaration
+
+bool FednClient::try_connect_once() {
+    if (channel) return true;                     // already connected
+
+    auto comb = getCombinerConfig();
+    channel   = setupGrpcChannel(comb);           // may return nullptr
+    return static_cast<bool>(channel);
+}
+
+void FednClient::tick_online(std::shared_ptr<GrpcClient> grpc)
+{
+    if (!channel) return;              // not connected yet
+    run(grpc);                         // blocking single round
 }
 
 /**
@@ -414,4 +455,6 @@ void FednClient::setPackage(std::string package) {
  */
 void FednClient::setPreferredCombiner(std::string preferredCombiner) {
     controllerConfig["preferred_combiner"] = preferredCombiner;
+}
+
 }

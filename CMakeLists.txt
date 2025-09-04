@@ -1,141 +1,143 @@
-cmake_minimum_required(VERSION 3.10)
-project(hw-cpp VERSION 1.0 DESCRIPTION "hw client in C++")
+cmake_minimum_required(VERSION 3.18)
+project(fedn-cpp-client LANGUAGES CXX)
 
+# Let old subprojects (like cnpy) configure without hard errors
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Find required dependencies for HTTP client
+# (macOS) scrub as-needed flags that cause linking pain on Darwin
+if(APPLE)
+  foreach(_var
+    CMAKE_EXE_LINKER_FLAGS
+    CMAKE_MODULE_LINKER_FLAGS
+    CMAKE_SHARED_LINKER_FLAGS
+    CMAKE_STATIC_LINKER_FLAGS
+  )
+    string(REPLACE "-Wl,--as-needed"    "" ${_var} "${${_var}}")
+    string(REPLACE "-Wl,--no-as-needed" "" ${_var} "${${_var}}")
+    string(REPLACE "--as-needed"        "" ${_var} "${${_var}}")
+    string(REPLACE "--no-as-needed"     "" ${_var} "${${_var}}")
+  endforeach()
+endif()
+
+include(FetchContent)
+
+# ---- Dependencies ----
+find_package(ZLIB REQUIRED)
 find_package(CURL REQUIRED)
-if(NOT CURL_FOUND)
-    message(FATAL_ERROR "curl not found! Please set the path.")
-endif()
-
-set(YAML_CPP_DIR "<path-to-yaml-cpp>")
-find_package(yaml-cpp REQUIRED)
-
-if(NOT yaml-cpp_FOUND)
-    message(FATAL_ERROR "yaml-cpp not found! Please set the path.")
-endif()
-
-include_directories(${YAML_CPP_DIR}/include)
-link_directories(${YAML_CPP_DIR}/lib)
-
 find_package(nlohmann_json REQUIRED)
+find_package(yaml-cpp CONFIG REQUIRED)
 
-if(NOT nlohmann_json_FOUND)
-    message(FATAL_ERROR "nlohmann_json not found! Please set the path.")
+# pick the correct imported target name
+if (TARGET yaml-cpp::yaml-cpp)
+  set(YAMLCPP_TARGET yaml-cpp::yaml-cpp)
+elseif (TARGET yaml-cpp)
+  set(YAMLCPP_TARGET yaml-cpp)
+else()
+  message(FATAL_ERROR "yaml-cpp imported target not found. Pass -Dyaml-cpp_DIR to the yaml-cpp *Config* directory.")
 endif()
 
-include_directories(${YAML_CPP_INCLUDE_DIRS})
 
-# Protobuf and gRPC
-# This assumes that gRPC and all its dependencies are already installed
-# on this system, so they can be located by find_package().
-
-# Find Protobuf installation
-# Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
+# If you installed protobuf/grpc to ~/.local
 option(protobuf_MODULE_COMPATIBLE TRUE)
-# Set CMAKE_PREFIX_PATH to the directory containing protobuf-config.cmake
-set(CMAKE_PREFIX_PATH "~/.local/lib/cmake/")
+list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local/lib/cmake")
+
 find_package(Protobuf CONFIG REQUIRED)
 message(STATUS "Using protobuf ${Protobuf_VERSION}")
 
-set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
-set(_REFLECTION gRPC::grpc++_reflection)
-if(CMAKE_CROSSCOMPILING)
-find_program(_PROTOBUF_PROTOC protoc)
-else()
-set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
-endif()
-
-# Find gRPC installation
-# Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
 find_package(gRPC CONFIG REQUIRED)
 message(STATUS "Using gRPC ${gRPC_VERSION}")
 
-set(_GRPC_GRPCPP gRPC::grpc++)
-if(CMAKE_CROSSCOMPILING)
-find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin)
-else()
-set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
-endif()
+set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
+set(_GRPC_GRPCPP        gRPC::grpc++)
+set(_REFLECTION         gRPC::grpc++_reflection)
+set(_PROTOC             $<TARGET_FILE:protobuf::protoc>)
+set(_GRPC_CPP_PLUGIN    $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 
-# Proto file for project
-get_filename_component(fedn_proto "src/protos/fedn.proto" ABSOLUTE)
-get_filename_component(fedn_proto_path "${fedn_proto}" PATH)
+# cnpy via FetchContent
+FetchContent_Declare(
+  cnpy
+  GIT_REPOSITORY https://github.com/rogersce/cnpy.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(cnpy)
+FetchContent_GetProperties(cnpy)
+set(CNPY_INCLUDE_DIR "${cnpy_SOURCE_DIR}" CACHE INTERNAL "cnpy include dir")
+target_include_directories(cnpy INTERFACE "${cnpy_SOURCE_DIR}")
 
-# Generated sources
-set(fedn_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/fedn.pb.cc")
-set(fedn_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/fedn.pb.h")
-set(fedn_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/fedn.grpc.pb.cc")
-set(fedn_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/fedn.grpc.pb.h")
+# ---- Protos (generated once at root) ----
+get_filename_component(FEDN_PROTO "${CMAKE_CURRENT_SOURCE_DIR}/src/protos/fedn.proto" ABSOLUTE)
+get_filename_component(FEDN_PROTO_DIR "${FEDN_PROTO}" PATH)
+
+set(GEN_PROTO_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY "${GEN_PROTO_DIR}")
+
+set(FEDN_PROTO_SRCS "${GEN_PROTO_DIR}/fedn.pb.cc")
+set(FEDN_PROTO_HDRS "${GEN_PROTO_DIR}/fedn.pb.h")
+set(FEDN_GRPC_SRCS "${GEN_PROTO_DIR}/fedn.grpc.pb.cc")
+set(FEDN_GRPC_HDRS "${GEN_PROTO_DIR}/fedn.grpc.pb.h")
+
 add_custom_command(
-      OUTPUT "${fedn_proto_srcs}" "${fedn_proto_hdrs}" "${fedn_grpc_srcs}" "${fedn_grpc_hdrs}"
-      COMMAND ${_PROTOBUF_PROTOC}
-      ARGS --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
-        --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
-        -I "${fedn_proto_path}"
-        --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
-        "${fedn_proto}"
-      DEPENDS "${fedn_proto}")
+  OUTPUT "${FEDN_PROTO_SRCS}" "${FEDN_PROTO_HDRS}" "${FEDN_GRPC_SRCS}" "${FEDN_GRPC_HDRS}"
+  COMMAND ${_PROTOC}
+  ARGS --grpc_out "${GEN_PROTO_DIR}"
+       --cpp_out  "${GEN_PROTO_DIR}"
+       -I "${FEDN_PROTO_DIR}"
+       --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN}"
+       "${FEDN_PROTO}"
+  DEPENDS "${FEDN_PROTO}"
+  COMMENT "Generating gRPC and Protobuf sources"
+)
 
-# Include generated *.pb.h files
-# if ${ARMADILLO_INCLUDE_DIR} is set, include it
-if(DEFINED ${ARMADILLO_INCLUDE_DIR})
-  include_directories("${CMAKE_CURRENT_BINARY_DIR}" "${ARMADILLO_INCLUDE_DIRS}" "${ARMADILLO_INCLUDE_DIR}")
-else()
-  include_directories("${CMAKE_CURRENT_BINARY_DIR}")
-endif()
-
-# fedn_grpc_proto
-add_library(fedn_grpc_proto
-  ${fedn_grpc_srcs}
-  ${fedn_grpc_hdrs}
-  ${fedn_proto_srcs}
-  ${fedn_proto_hdrs})
+add_library(fedn_grpc_proto STATIC
+  "${FEDN_PROTO_SRCS}" "${FEDN_PROTO_HDRS}"
+  "${FEDN_GRPC_SRCS}"  "${FEDN_GRPC_HDRS}"
+)
+target_include_directories(fedn_grpc_proto PUBLIC "${GEN_PROTO_DIR}")
 target_link_libraries(fedn_grpc_proto
-  ${_REFLECTION}
-  ${_GRPC_GRPCPP}
-  ${_PROTOBUF_LIBPROTOBUF})
-
-# Include directories fednlib
-include_directories(include)
-
-# Source files fednlib
-set(SOURCES
-    src/http.cpp
-    src/grpc.cpp
-    src/fedn.cpp
-    src/utils.cpp
+  PUBLIC
+    ${_GRPC_GRPCPP}
+    ${_PROTOBUF_LIBPROTOBUF}
+    ${_REFLECTION}
 )
 
-# Add fednlib as a library
-add_library(fednlib STATIC ${SOURCES})
-
-# Create an alias target
-add_library(fednlib::fednlib ALIAS fednlib)
-
-# Link the fednlib with libraries
-target_link_libraries(fednlib PUBLIC 
-  fedn_grpc_proto 
-  absl::flags 
-  absl::flags_parse 
-  ${_REFLECTION} 
-  ${_GRPC_GRPCPP} 
-  ${_PROTOBUF_LIBPROTOBUF} 
-  CURL::libcurl 
-  yaml-cpp 
-  ${YAML_CPP_LIBRARIES} 
-  nlohmann_json::nlohmann_json
+# ---- fednlib (define ONCE, link everything here) ----
+add_library(fednlib STATIC
+  src/http.cpp
+  src/grpc.cpp
+  src/fedn.cpp
+  src/utils.cpp
 )
 
-if(DEFINED ${ARMADILLO_LIBRARY})
-target_link_libraries(fednlib PRIVATE ${ARMADILLO_LIBRARY})
+target_include_directories(fednlib
+  PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GEN_PROTO_DIR}"           # so consumers can #include generated headers via fednlib
+)
+
+target_link_libraries(fednlib
+  PUBLIC
+    fedn_grpc_proto
+    CURL::libcurl
+    ${YAMLCPP_TARGET}  
+    nlohmann_json::nlohmann_json
+  PRIVATE
+    cnpy
+    ZLIB::ZLIB
+)
+
+# Optional LibTorch example (off by default)
+option(BUILD_MNIST_LIBTORCH "Build LibTorch example" OFF)
+if(BUILD_MNIST_LIBTORCH)
+  find_package(Torch REQUIRED)
+  add_executable(mnist_libtorch_stdvec examples/mnist-libtorch-stdvec/mnist-libtorch-stdvec.cpp)
+  target_link_libraries(mnist_libtorch_stdvec PRIVATE fednlib "${TORCH_LIBRARIES}")
+  set_property(TARGET mnist_libtorch_stdvec PROPERTY CXX_STANDARD 14)
 endif()
 
-# Link header files to fednlib
-target_include_directories(fednlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-# Include directories
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-
-
+# ---- Example client (NO proto generation here; just link) ----
+add_subdirectory(examples/my-client)

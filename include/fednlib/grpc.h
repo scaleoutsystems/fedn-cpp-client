@@ -21,6 +21,7 @@ class LoggingContext {
         std::string modelId;
         std::string roundId;
         std::string sessionId;
+        std::string correlationId; 
         int step;
     public:
         LoggingContext(std::string modelId, std::string roundId, std::string sessionId, int step) : 
@@ -30,6 +31,7 @@ class LoggingContext {
         std::string getModelId() { return modelId; }
         std::string getRoundId() { return roundId; }
         std::string getSessionId() { return sessionId; }
+        std::string getCorrelationId(){ return correlationId; }
         int getStep() { return step; }
         void setStep(int step) { this->step = step; }
         void incrementStep() { this->step++; }
@@ -37,6 +39,7 @@ class LoggingContext {
             this->modelId = "";
             this->roundId = "";
             this->sessionId = "";
+            correlationId.clear();
             this->step = 0;
         }
 };  

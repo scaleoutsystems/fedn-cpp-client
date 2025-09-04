@@ -10,6 +10,7 @@
 #include "../include/fednlib/utils.h"
 #include "google/protobuf/timestamp.pb.h"
 
+
 using grpc::ClientContext;
 using grpc::Status;
 using grpc::ClientReader;
@@ -29,6 +30,8 @@ using fedn::CLIENT;
 using fedn::Response;
 using fedn::ModelMetric;
 using fedn::AttributeMessage;
+using fedn::FileChunk;
+
 
 /**
  * @brief Constructs a new GrpcClient object.
@@ -162,11 +165,11 @@ void GrpcClient::connectTaskStream() {
 std::string GrpcClient::downloadModel(const std::string& modelID) {
 
     // request 
-    ModelRequest request;
-    request.set_id(modelID);
+    fedn::ModelRequest request;
+    request.set_model_id(modelID);
 
     // context
-    ClientContext context;
+    grpc::ClientContext context;
 
      // Set client
     Client* client = new Client();
@@ -177,40 +180,21 @@ std::string GrpcClient::downloadModel(const std::string& modelID) {
     // Pass ownership of client to protobuf message
     request.set_allocated_sender(client);
 
-    // Get ClientReader from stream
-    std::unique_ptr<ClientReader<ModelResponse> > reader(
-        modelserviceStub_->Download(&context, request));
+    auto reader = modelserviceStub_->Download(&context, request);
 
-    // Collection for data
-    std::string accumulatedData;
-
-    // Read from stream
-    ModelResponse modelResponse;
-    while (reader->Read(&modelResponse)) {
-        std::cout << "ModelResponseID: " << modelResponse.id() << std::endl;
-        std::cout << "ModelResponseStatus: " << modelResponse.status() << std::endl;
-        if (modelResponse.status() == ModelStatus::IN_PROGRESS) {
-            const std::string& dataResponse = modelResponse.data();
-            accumulatedData += dataResponse;
-            std::cout << "Download in progress: " << modelResponse.id() << std::endl;
-            std::cout << "Downloaded size: " << accumulatedData.size() << " bytes" << std::endl;
-        } 
-        else if (modelResponse.status() == ModelStatus::OK) {
-            // Print download complete
-            std::cout << "Download complete for model: " << modelResponse.id() << std::endl;
-        }
-        else if (modelResponse.status() == ModelStatus::FAILED) {
-            // Print download failed
-            std::cout << "Download failed: internal server error" << std::endl;      
-        }
-    }
-
-    reader->Finish();
-    std::cout << "Downloaded size: " << accumulatedData.size() << " bytes" << std::endl;
-    std::cout << "Disconnecting from DownloadStream" << std::endl;
+    fedn::FileChunk chunk;
+    std::string accumulated;
     
-    // return accumulatedData
-    return accumulatedData;
+    while (reader->Read(&chunk)) {
+        std::cout << "Received chunk of size: " << chunk.data().size() << std::endl;
+        accumulated += chunk.data();
+    }
+    reader->Finish();
+    std::cout << "Download complete for model: " << modelID << std::endl;
+    std::cout << "Total size of downloaded data: " << accumulated.size() << " bytes" << std::endl;
+    std::cout << "Disconnecting from DownloadStream" << std::endl;
+    // return accumulated data
+    return accumulated;
 }
 
 /**
@@ -231,11 +215,12 @@ void GrpcClient::downloadModelToFile(const std::string& modelID, const std::stri
     std::cout << "Buffering model " << modelID << "..." << std::endl;
 
     // request 
-    ModelRequest request;
-    request.set_id(modelID);
+    fedn::ModelRequest request;
+    request.set_model_id(modelID);
 
     // context
-    ClientContext context;
+    grpc::ClientContext context;
+
 
     // Set client
     Client* client = new Client();
@@ -246,53 +231,37 @@ void GrpcClient::downloadModelToFile(const std::string& modelID, const std::stri
     // Pass ownership of client to protobuf message
     request.set_allocated_sender(client);
 
-    // Get ClientReader from stream
-    std::unique_ptr<ClientReader<ModelResponse> > reader(
-        modelserviceStub_->Download(&context, request));
-
-    // Create an ofstream object and open the file in binary mode
-    std::ofstream outFile(modelPath, std::ios::binary); // Before stream loop
-
-    // Check if the file was opened successfully
+    std::ofstream outFile(modelPath, std::ios::binary);
     if (!outFile) {
-        std::cerr << "Error opening file for writing" << std::endl;
+        std::cerr << "Error opening file for writing: " << modelPath << std::endl;
+        return;
     }
 
-    // Number of bytes streamed so far
+    auto reader = modelserviceStub_->Download(&context, request);
+
     size_t streamedDataSize = 0;
 
-    // Read from stream
-    ModelResponse modelResponse;
-    while (reader->Read(&modelResponse)) {
-        std::cout << "ModelResponseID: " << modelResponse.id() << std::endl;
-        std::cout << "ModelResponseStatus: " << modelResponse.status() << std::endl;
-        if (modelResponse.status() == ModelStatus::IN_PROGRESS) {
-            const std::string& dataResponse = modelResponse.data();
-            // Increment number of bytes streamed
-            streamedDataSize += dataResponse.size();
-            // Write the binary string to the file
-            outFile.write(dataResponse.c_str(), dataResponse.size()); // In each iteration. After chunk is downloaded
-            std::cout << "Download in progress: " << modelResponse.id() << std::endl;
-            // TODO Calculate and print current written size
-            std::cout << "Downloaded size: " << streamedDataSize << " bytes" << std::endl;
-        }
-        else if (modelResponse.status() == ModelStatus::OK) {
-            // Print download complete
-            std::cout << "Download complete for model: " << modelResponse.id() << std::endl;
-        }
-        else if (modelResponse.status() == ModelStatus::FAILED) {
-            // Print download failed
-            std::cout << "Download failed: internal server error" << std::endl;      
-        }
+    fedn::FileChunk chunk;
+    while (reader->Read(&chunk)) {
+        const std::string& data = chunk.data();         // bytes payload
+        outFile.write(data.data(), static_cast<std::streamsize>(data.size()));
+        streamedDataSize += data.size();
+
+        // Optional progress log
+        std::cout << "Downloaded size: " << streamedDataSize << " bytes" << std::endl;
+    }
+    grpc::Status status = reader->Finish();
+    outFile.close();
+
+    if (status.ok()) {
+        std::cout << "Download complete for model: " << modelID << std::endl;
+        std::cout << "Total size of downloaded data: " << streamedDataSize << " bytes" << std::endl;
+    } else {
+        std::cerr << "Download failed for model: " << modelID << "\n";
+        std::cerr << status.error_code() << ": " << status.error_message() << "\n";
     }
 
-    // Close the file
-    outFile.close();
-    std::cout << "modelData saved to file " << modelPath << " successfully" << std::endl;
-
-    reader->Finish();
-    std::cout << "Downloaded size: " << streamedDataSize << " bytes" << std::endl;
-    std::cout << "Disconnecting from DownloadStream" << std::endl;
+    
 }
 
 /**
@@ -306,152 +275,110 @@ void GrpcClient::downloadModelToFile(const std::string& modelID, const std::stri
  * @param modelData The binary data of the model to be uploaded.
  */
 void GrpcClient::uploadModel(std::string& modelID, std::string& modelData) {
-    // response 
-    ModelResponse response;
-    // context
-    ClientContext context;
+    fedn::ModelResponse response;
+    grpc::ClientContext ctx;
 
-    // Client
-    Client* client = new Client();
-    client->set_name(name_);
-    client->set_role(CLIENT);
-    client->set_client_id(id_);
+    // Attach metadata to the RPC (e.g., model ID, client ID, client name)
+    ctx.AddMetadata("model-id", modelID);
+    ctx.AddMetadata("client_id", id_);
+    ctx.AddMetadata("client_name", name_);
+    std::cout << "Session ID: " << loggingContext.getSessionId() << "\n";
 
-    // Get ClientWriter from stream
-    std::unique_ptr<ClientWriter<ModelRequest> > writer(
-        modelserviceStub_->Upload(&context, &response));
+    ctx.AddMetadata("session_id", loggingContext.getSessionId());
 
-    // Calculate the number of chunks
-    size_t chunkSize = this->getChunkSize();
-    size_t totalSize = modelData.size();
-    size_t offset = 0;
 
-    std::cout << "Upload in progress: " << modelID << std::endl;
-    std::cout << "Chunk size: " << chunkSize << " bytes" << std::endl;
-
-    while (offset < totalSize) {
-        ModelRequest request;
-        size_t currentChunkSize = std::min(chunkSize, totalSize - offset);
-        request.set_data(modelData.data() + offset, currentChunkSize);
-        request.set_id(modelID);
-        request.set_status(ModelStatus::IN_PROGRESS);
-        // Pass ownership of client to protobuf message only for the first chunk
-        if (offset == 0) {
-            request.set_allocated_sender(client);
-        }
-
-        if (!writer->Write(request)) {
-            // Broken stream.
-            std::cout << "Upload failed for model: " << modelID << std::endl;
-            std::cout << "Disconnecting from UploadStream" << std::endl;
-            grpc::Status status = writer->Finish();
-            return;
-        }
-        std::cout << "Uploading chunk: " << offset << " - " << offset + currentChunkSize << std::endl;
-        offset += currentChunkSize;
-    }
-
-    // Finish writing to stream with final message
-    ModelRequest requestFinal;
-    requestFinal.set_id(modelID);
-    requestFinal.set_status(ModelStatus::OK);
-    writer->Write(requestFinal);
-    writer->WritesDone();
-    grpc::Status status = writer->Finish();
-
-    if (status.ok()) {
-        std::cout << "Upload complete for local model: " << modelID << std::endl;
-        // Print message from response
-        std::cout << "Response: " << response.message() << std::endl;
-    } else {
-        std::cout << "Upload failed for model: " << modelID << std::endl;
-        std::cout << status.error_code() << ": " << status.error_message() << std::endl;
-        // Print message from response
-        std::cout << "Response: " << response.message() << std::endl;
-    }
-}
-
-void GrpcClient::uploadModelFromFile(const std::string& modelID, const std::string& modelPath) {
-    // Create an ifstream object and open the file in binary mode
-    std::ifstream inFile(modelPath, std::ios::binary);
-    // Check if the file was opened successfully
-    if (!inFile) {
-        std::cerr << "Error opening file " << modelPath << " for reading" << std::endl;
+    auto writer = modelserviceStub_->Upload(&ctx, &response);
+    if (!writer) {
+        std::cerr << "Upload(): could not create writer\n";
         return;
     }
 
-    // Get the length of the file
-    inFile.seekg(0, inFile.end);
-    size_t totalSize = inFile.tellg();
-    inFile.seekg(0, inFile.beg);
-
-    // response 
-    ModelResponse response;
-    // context
-    ClientContext context;
-
-    // Client
-    Client* client = new Client();
-    client->set_name(name_);
-    client->set_role(CLIENT);
-    client->set_client_id(id_);
-
-    // Get ClientWriter from stream
-    std::unique_ptr<ClientWriter<ModelRequest> > writer(
-        modelserviceStub_->Upload(&context, &response));
-
-    // Calculate the number of chunks
-    size_t chunkSize = this->getChunkSize();
+    const size_t chunkSize = getChunkSize();  // e.g., 1<<20
+    const size_t totalSize = modelData.size();
     size_t offset = 0;
 
-    std::cout << "Upload in progress: " << modelID << std::endl;
-    std::cout << "Chunk size: " << chunkSize << " bytes" << std::endl;
+    std::cout << "Upload in progress: " << modelID << "\n";
+    std::cout << "Total size: " << totalSize << " bytes\n";
+    std::cout << "Chunk size: " << chunkSize << " bytes\n";
 
     while (offset < totalSize) {
-        ModelRequest request;
-        size_t currentChunkSize = std::min(chunkSize, totalSize - offset);
-        std::string buffer(currentChunkSize, '\0');
-        inFile.read(&buffer[0], currentChunkSize);
-        std::cout << "File pointer position: " << inFile.tellg() << std::endl;
-        request.set_data(buffer);
-        request.set_id(modelID);
-        request.set_status(ModelStatus::IN_PROGRESS);
-        // Pass ownership of client to protobuf message only for the first chunk
-        if (offset == 0) {
-            request.set_allocated_sender(client);
+        fedn::FileChunk chunk;
+
+        const size_t current = std::min(chunkSize, totalSize - offset);
+        chunk.set_data(modelData.data() + offset, current);
+
+        if (!writer->Write(chunk)) {
+            std::cerr << "Upload stream broken for model " << modelID << "\n";
+            break;
         }
 
-        if (!writer->Write(request)) {
-            // Broken stream.
-            std::cout << "Upload failed for model: " << modelID << std::endl;
-            std::cout << "Disconnecting from UploadStream" << std::endl;
-            grpc::Status status = writer->Finish();
-            inFile.close();
-            return;
-        }
-        std::cout << "Uploading chunk: " << offset << " - " << offset + currentChunkSize << std::endl;
-        offset += currentChunkSize;
+        std::cout << "Uploading chunk: " << offset << " - " << (offset + current) << "\n";
+        offset += current;
     }
 
-    // Finish writing to stream with final message
-    ModelRequest requestFinal;
-    requestFinal.set_id(modelID);
-    requestFinal.set_status(ModelStatus::OK);
-    writer->Write(requestFinal);
     writer->WritesDone();
-    grpc::Status status = writer->Finish();
-    inFile.close();
+    auto status = writer->Finish();
 
     if (status.ok()) {
-        std::cout << "Upload complete for local model: " << modelID << std::endl;
-        // Print message from response
-        std::cout << "Response: " << response.message() << std::endl;
+        std::cout << "Upload complete for local model: " << modelID << "\n";
+        std::cout << "Response: " << response.message() << "\n";
     } else {
-        std::cout << "Upload failed for model: " << modelID << std::endl;
-        std::cout << status.error_code() << ": " << status.error_message() << std::endl;
-        // Print message from response
-        std::cout << "Response: " << response.message() << std::endl;
+        std::cerr << "Upload failed for model: " << modelID << "\n";
+        std::cerr << status.error_code() << ": " << status.error_message() << "\n";
+        std::cerr << "Response: " << response.message() << "\n";
     }
+}
+
+void GrpcClient::uploadModelFromFile(const std::string& modelID,
+    const std::string& modelPath) {
+std::ifstream in(modelPath, std::ios::binary);
+if (!in) {
+std::cerr << "Error opening " << modelPath << " for reading\n";
+}
+
+fedn::ModelResponse response;
+grpc::ClientContext ctx;
+
+ctx.AddMetadata("model-id", modelID);
+ctx.AddMetadata("client_id", id_);
+ctx.AddMetadata("name", name_);
+ctx.AddMetadata("session_id", loggingContext.getSessionId());
+ctx.AddMetadata("correlation_id", loggingContext.getCorrelationId());
+std::cout << "Correlation ID: " << loggingContext.getCorrelationId() << "\n";
+std::cout << "Session ID: " << loggingContext.getSessionId() << "\n";
+auto writer = modelserviceStub_->Upload(&ctx, &response);
+if (!writer) {
+std::cerr << "Upload(): could not create writer\n";
+}
+
+const std::size_t chunkSize = getChunkSize();
+std::string buf;
+buf.resize(chunkSize);
+
+while (in) {
+in.read(&buf[0], buf.size());
+std::streamsize got = in.gcount();
+if (got <= 0) break;
+
+fedn::FileChunk chunk;
+chunk.set_data(buf.data(), static_cast<size_t>(got));  
+if (!writer->Write(chunk)) {
+std::cerr << "Upload stream broken for model " << modelID << "\n";
+break;
+}
+}
+
+writer->WritesDone();
+auto status = writer->Finish();
+
+if (!status.ok()) {
+std::cerr << "Upload failed: " << status.error_code()
+<< " " << status.error_message() << "\n";
+std::cerr << "Response: " << response.message() << "\n";
+}
+
+std::cout << "Upload complete for model " << modelID << "\n";
+std::cout << "Response: " << response.message() << "\n";
 }
 
 /**
@@ -499,8 +426,8 @@ void GrpcClient::updateLocalModel(const std::string& modelID, const std::string&
     std::string modelUpdateID = generateRandomUUID();
     
     // Create file paths
-    std::string inModelPath = "./" + tempModelFile + ".bin";
-    std::string outModelPath = "./" + modelUpdateID + ".bin";
+    std::string inModelPath = "./" + tempModelFile + ".npz";
+    std::string outModelPath = "./" + modelUpdateID + ".npz";
 
     // Stream model and write it to file
     downloadModelToFile(modelID, inModelPath);
@@ -562,7 +489,7 @@ void GrpcClient::validateGlobalModel(const std::string& modelID, TaskRequest& re
     std::string tempMetricFile = generateRandomUUID();
     
     // Create file paths
-    std::string modelPath = "./" + tempModelFile + ".bin";
+    std::string modelPath = "./" + tempModelFile + ".npz";
     std::string metricPath = "./" + tempMetricFile + ".json";
 
     // Stream model to file
@@ -673,6 +600,8 @@ void GrpcClient::sendModelUpdate(const std::string& modelID, std::string& modelU
     modelUpdate.set_allocated_sender(&client);
     modelUpdate.set_model_update_id(modelUpdateID);
     modelUpdate.set_model_id(modelID);
+    modelUpdate.set_session_id(loggingContext.getSessionId());
+    modelUpdate.set_correlation_id(loggingContext.getCorrelationId());
 
     // get current date and time to string
     time_t now = time(0);
@@ -993,6 +922,7 @@ bool GrpcClient::logAttributes(const std::map<std::string, std::string>& attribu
 LoggingContext::LoggingContext(TaskRequest& requestData) {
     this->sessionId = requestData.session_id();
     this->modelId = requestData.model_id();
+    this->correlationId = requestData.correlation_id();
     
     if (requestData.type() == StatusType::MODEL_UPDATE) {
         json roundData = json::parse(requestData.data());

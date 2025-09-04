@@ -11,11 +11,16 @@
 #include "grpc.h"
 #include "http.h"
 
+// for the ClientOptions struct
+#include "ClientOptions.hpp"    
+
 using grpc::ChannelInterface;
 
+namespace fedn {
 class FednClient {
 public:
-    FednClient(std::string configFilePath);
+    //FednClient(std::string configFilePath);
+    explicit FednClient(const ClientOptions& opts); 
     std::map<std::string, std::string> getCombinerConfig();
     std::shared_ptr<ChannelInterface> setupGrpcChannel(std::map<std::string, std::string> combinerConfig);
     void run(std::shared_ptr<GrpcClient> grpcClient);
@@ -35,8 +40,12 @@ public:
     void setName(std::string name);
     void setPackage(std::string package);
     void setPreferredCombiner(std::string preferredCombiner);
-
+    // asynchronous methods
+    bool try_connect_once();       
+    void tick_online(std::shared_ptr<GrpcClient> grpc);
+    
 private:
+    ClientOptions opts_;
     std::shared_ptr<GrpcClient> grpcClient;
     std::shared_ptr<HttpClient> httpClient;
     std::shared_ptr<ChannelInterface> channel;
@@ -45,5 +54,6 @@ private:
 
     std::map<std::string, std::string> assignCombiner();
 };
+}
 
 #endif // FEDNCLIENT_H

@@ -60,15 +60,17 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     // Convert the JSON data to a string
     std::string jsonData = requestData.dump();
 
+    std::cout << "Request data: " << jsonData << std::endl;
+
     // Select HTTP protocol based on insecure flag
     std::string httpProtocol = "https://";
     if (controllerConfig["insecure"] == "true") {
         httpProtocol = "http://";
     }
-
     // add endpoint api/v1/clients/add to the apiUrl
     const std::string addClientApiUrl = httpProtocol + apiUrl + "/api/v1/clients/add";
 
+    std::cout << "POST URL: " << addClientApiUrl << std::endl;
     // Set libcurl options for the POST request
     curl_easy_setopt(curl, CURLOPT_URL, addClientApiUrl.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonData.c_str());
@@ -92,7 +94,7 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     if (!token.empty()) {
         headers = curl_slist_append(headers, ("Authorization: " + fillString + token).c_str());
     }
-
+    std::cout << "Using token scheme: " << token_scheme << std::endl;
     // Set the headers for the POST request
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
@@ -103,8 +105,22 @@ json HttpClient::assign(std::map<std::string, std::string> controllerConfig) {
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseData);
 
     // Perform the HTTP POST request
-    CURLcode res = curl_easy_perform(curl);
+    CURLcode res = CURLE_OK;           
 
+    try {
+        std::cout << "Sending POST request to " << addClientApiUrl << std::endl;
+        res = curl_easy_perform(curl); // assign inside the try
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error sending POST request: " << e.what() << std::endl;
+        return json{};
+    }
+    
+    /* now res is still visible here */
+    if (res != CURLE_OK) {
+        std::cerr << "curl_easy_perform() failed: "
+                  << curl_easy_strerror(res) << std::endl;
+    }
     // Get status code
     long statusCode;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
