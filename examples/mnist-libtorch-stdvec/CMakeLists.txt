@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(hw-cpp-example VERSION 1.0 DESCRIPTION "Example FEDn client in C++")
 
+if (APPLE)
+  return()
+endif()
 
 # Find required dependencies for HTTP client
 find_package(CURL REQUIRED)

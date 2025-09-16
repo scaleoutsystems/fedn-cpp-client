@@ -1,8 +1,9 @@
 #include "fednlib.h"
-#include "fednlib.h"
 #include "fednlib/ClientOptions.hpp"
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
+#include <grpcpp/grpcpp.h>
+
 
 #include <cnpy.h>              
 #include <random>
@@ -314,9 +315,9 @@ static Metrics train_mlp(MLPParams& p,
 class CustomGrpcClient : public GrpcClient {
     public:
         // pass a unique seed (e.g., your --client_id) when constructing
-        explicit CustomGrpcClient(std::shared_ptr<ChannelInterface> channel,
-                                  std::uint64_t client_seed)
-            : GrpcClient(channel), client_seed_(client_seed) {}
+        explicit CustomGrpcClient(std::shared_ptr<grpc::ChannelInterface> channel,
+            std::uint64_t client_seed)  
+            : GrpcClient(channel), client_seed_(client_seed) {} 
     
         void train(const std::string& inModelPath, const std::string& outModelPath) override {
             std::cout << "USER-DEFINED CODE: Training...\n";
@@ -418,12 +419,15 @@ int main(int argc, char** argv) {
 
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if      (arg.rfind("--discover_host=",0)==0) opts.discover_host = arg.substr(16);
-        else if (arg.rfind("--token=",0)==0)         opts.token         = arg.substr(8);
-        else if (arg.rfind("--name=",0)==0)          opts.name          = arg.substr(7);
-        else if (arg.rfind("--client_id=",0)==0)     opts.client_id     = std::stoull(arg.substr(12));
-        else if (arg.rfind("--node_ip=",0)==0)       np.host            = arg.substr(10);
-        else if (arg.rfind("--node_port=",0)==0)     np.port            = std::stoi(arg.substr(12));
+        auto eq = arg.find('=');
+        auto val = (eq == std::string::npos) ? std::string() : arg.substr(eq + 1);
+    
+        if      (arg.rfind("--discover_host=",0)==0 || arg.rfind("--host=",0)==0) opts.discover_host = val;
+        else if (arg.rfind("--token=",0)==0)                                       opts.token         = val;
+        else if (arg.rfind("--name=",0)==0)                                        opts.name          = val;
+        else if (arg.rfind("--client_id=",0)==0)                                   opts.client_id     = std::stoull(val);
+        else if (arg.rfind("--node_ip=",0)==0 || arg.rfind("--node-ip=",0)==0)     np.host            = val;
+        else if (arg.rfind("--node_port=",0)==0 || arg.rfind("--node-port=",0)==0) np.port            = std::stoi(val);
     }
 
     if (opts.discover_host.empty() || opts.token.empty()) {
@@ -432,30 +436,43 @@ int main(int argc, char** argv) {
         return 2;
     }
 
+    std::cout << "ARGS: node_ip=" << (np.host.empty() ? "<empty>" : np.host)
+          << " node_port=" << np.port
+          << " token_len=" << opts.token.size() << "\n";
+
     std::cout << "Starting client name=" << opts.name
               << " id=" << opts.client_id << "\n";
 
     fedn::FednClient cli(opts);
 
-    // 1) Register & get combiner from API (normal path)
+    // 1) Register the client
     auto comb = cli.getCombinerConfig();
 
-    // 2) Override transport to NodeIP:NodePort if provided
+    cli.setToken(opts.token);
+
     if (np.enabled()) {
-        comb.fqdn.clear();          // ensure no TLS/Ingress path
-        comb.host = np.host;
-        comb.port = np.port;
+        std::cout << "Forcing NodePort " << np.host << ":" << np.port << " (plaintext)\n";
+    
+        // 1) Make the gRPC target for nodeport access
+        const std::string target = np.host + ":" + std::to_string(np.port);
+        std::cerr << "direct target: " << target << "\n";
+    
+        // 2) (optional) nuke any proxy influence
+        unsetenv("http_proxy"); unsetenv("https_proxy");
+        unsetenv("HTTP_PROXY"); unsetenv("HTTPS_PROXY");
+        unsetenv("GRPC_PROXY_EXP");
+    
+        // 3) Plaintext channel
+        grpc::ChannelArguments args;
+        auto chan = grpc::CreateCustomChannel(target, grpc::InsecureChannelCredentials(), args);
+        if (!chan) { std::cerr << "CreateCustomChannel returned null\n"; return 3; }
+    
+        // 4) Run the client
+        auto grpc_cli = std::make_shared<CustomGrpcClient>(chan, /*client_seed=*/opts.client_id);
+
+        cli.setToken(opts.token);
+        cli.run(grpc_cli);
+        return 0;
     }
 
-    // 3) Build channel. If your helper chooses TLS when fqdn is set, this will be plaintext for NodePort.
-    auto chan = cli.setupGrpcChannel(comb);
-    if (!chan) {
-        std::cerr << "Failed to set up gRPC channel—will exit.\n";
-        return 3;
-    }
-
-    auto grpc = std::make_shared<CustomGrpcClient>(chan, /*client_seed=*/opts.client_id);
-    cli.run(grpc);
-
-    return 0;
 }
