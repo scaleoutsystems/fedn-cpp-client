@@ -141,7 +141,12 @@ async def run_client(client_id: int, sem: asyncio.Semaphore | None):
             print("CMD:", " ".join(cmd))
             proc = await asyncio.create_subprocess_exec(*cmd, stdout=stdout, stderr=stderr,
                                                         start_new_session=True, env=env)
-
+            # CLOSE PARENT COPIES RIGHT AWAY
+            for f in (out_f, err_f):
+                if f:
+                    f.close()
+                    # and set to None so you don't try to close again later
+            out_f = err_f = None
             # stay online for duration unless stopped
             online = jittered(args.online_for)
             try:
