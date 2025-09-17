@@ -428,7 +428,10 @@ int main(int argc, char** argv) {
         else if (arg.rfind("--client_id=",0)==0)                                   opts.client_id     = std::stoull(val);
         else if (arg.rfind("--node_ip=",0)==0 || arg.rfind("--node-ip=",0)==0)     np.host            = val;
         else if (arg.rfind("--node_port=",0)==0 || arg.rfind("--node-port=",0)==0) np.port            = std::stoi(val);
+        else if (arg.rfind("--preferred_combiner=",0)==0 || arg.rfind("--preferred-combiner=",0)==0) opts.preferred_combiner = val;
+
     }
+    std::cout << "Preferred combiner: " << opts.preferred_combiner << "\n";
 
     if (opts.discover_host.empty() || opts.token.empty()) {
         std::cerr << "Usage: ./my-client --discover_host=... --token=..."

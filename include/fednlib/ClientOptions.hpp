@@ -13,6 +13,7 @@ struct ClientOptions {
     bool        insecure      = false;
     std::string package       = "local";
     std::string helper_type   = "";  
+    std::string preferred_combiner = "";
 };
 
 } 

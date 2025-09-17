@@ -2,7 +2,8 @@
 #include <fstream>
 #include <stdlib.h>
 #include <random>
-
+#include <cstdlib>
+#include <cstring>
 #include "../include/fednlib/utils.h"
 
 /**
@@ -308,12 +309,22 @@ std::map<std::string, std::string> readControllerConfig(YAML::Node config) {
     }
     
     // Check if preferred_combiner is in the config, else use default empty string
+    std::string pcfg;
     if (config["preferred_combiner"]) {
-        controllerConfig["preferred_combiner"] = config["preferred_combiner"].as<std::string>();
+        pcfg = config["preferred_combiner"].as<std::string>();
     } else {
         std::cout << "Preferred combiner not found in config, using default None" << std::endl;
-        controllerConfig["preferred_combiner"] = "";
+        pcfg = "";
     }
+    // ENV override takes precedence (so CLI / launcher can inject without YAML edits)
+    if (const char* penv = std::getenv("FEDN_PREFERRED_COMBINER")) {
+        if (std::strlen(penv) > 0) {
+            std::cout << "Preferred combiner overridden via ENV: " << penv << std::endl;
+            pcfg = penv;
+        }
+    }
+
+    controllerConfig["preferred_combiner"] = pcfg;
     std::cout << "HTTP request data read successfully" << std::endl;
 
     return controllerConfig;
